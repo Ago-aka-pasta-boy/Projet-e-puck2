@@ -4,12 +4,32 @@
 #include <usbcfg.h>
 #include <chprintf.h>
 
+#include "leds.h"
 #include <motors.h>
 #include <audio/microphone.h>
 #include <audio_processing.h>
 #include <communications.h>
 #include <fft.h>
 #include <arm_math.h>
+
+//defints
+#define A  				0.05f
+#define B				0.95f
+#define FILTER_SIZE		30
+
+#define MIN_VALUE_THRESHOLD	10000
+
+#define MIN_FREQ		25	//we don't analyze before this index to not use resources for nothing
+#define FREQ_SENDER		32 //1990
+#define FREQ_RECIEVER	38	//406Hz
+#define MAX_FREQ		38	//we don't analyze after this index to not use resources for nothing
+#define MAX_ERROR		1	//frequency tolerance
+
+#define MAPPING_COEFF_LR 	180 //Coeffs used in angle calculation
+#define MAPPING_COEFF_FB 	130
+
+
+
 
 //semaphore
 static BSEMAPHORE_DECL(sendToComputer_sem, TRUE);
@@ -25,29 +45,24 @@ static float micRight_output[FFT_SIZE];
 static float micFront_output[FFT_SIZE];
 static float micBack_output[FFT_SIZE];
 
-#define MIN_VALUE_THRESHOLD	10000 
+static float phase_diff_lr[FILTER_SIZE] ={ 0}; //phase differences from the audio data
+static float phase_diff_fb[FILTER_SIZE] ={ 0};
+static float current_phase_diff_lr=0;
+static float current_phase_diff_fb=0;
 
-#define MIN_FREQ		10	//we don't analyze before this index to not use resources for nothing
-#define FREQ_FORWARD	16	//250Hz
-#define FREQ_LEFT		19	//296Hz
-#define FREQ_RIGHT		23	//359HZ
-#define FREQ_BACKWARD	26	//406Hz
-#define MAX_FREQ		30	//we don't analyze after this index to not use resources for nothing
+static float angle = 0; //angles to the sound source
 
-#define FREQ_FORWARD_L		(FREQ_FORWARD-1)
-#define FREQ_FORWARD_H		(FREQ_FORWARD+1)
-#define FREQ_LEFT_L			(FREQ_LEFT-1)
-#define FREQ_LEFT_H			(FREQ_LEFT+1)
-#define FREQ_RIGHT_L		(FREQ_RIGHT-1)
-#define FREQ_RIGHT_H		(FREQ_RIGHT+1)
-#define FREQ_BACKWARD_L		(FREQ_BACKWARD-1)
-#define FREQ_BACKWARD_H		(FREQ_BACKWARD+1)
+static float mov_avg_lr = 0;
+static float mov_avg_fb = 0;
+
+static uint8_t audio_status = NO_AUDIO;
+
 
 /*
 *	Simple function used to detect the highest value in a buffer
 *	and to execute a motor command depending on it
 */
-void sound_remote(float* data){
+uint16_t max_frequency(float* data){
 	float max_norm = MIN_VALUE_THRESHOLD;
 	int16_t max_norm_index = -1; 
 
@@ -58,32 +73,7 @@ void sound_remote(float* data){
 			max_norm_index = i;
 		}
 	}
-
-	//go forward
-	if(max_norm_index >= FREQ_FORWARD_L && max_norm_index <= FREQ_FORWARD_H){
-		left_motor_set_speed(600);
-		right_motor_set_speed(600);
-	}
-	//turn left
-	else if(max_norm_index >= FREQ_LEFT_L && max_norm_index <= FREQ_LEFT_H){
-		left_motor_set_speed(-600);
-		right_motor_set_speed(600);
-	}
-	//turn right
-	else if(max_norm_index >= FREQ_RIGHT_L && max_norm_index <= FREQ_RIGHT_H){
-		left_motor_set_speed(600);
-		right_motor_set_speed(-600);
-	}
-	//go backward
-	else if(max_norm_index >= FREQ_BACKWARD_L && max_norm_index <= FREQ_BACKWARD_H){
-		left_motor_set_speed(-600);
-		right_motor_set_speed(-600);
-	}
-	else{
-		left_motor_set_speed(0);
-		right_motor_set_speed(0);
-	}
-	
+	return max_norm_index;
 }
 
 /*
@@ -137,6 +127,7 @@ void processAudioData(int16_t *data, uint16_t num_samples){
 		*	This FFT function stores the results in the input buffer given.
 		*	This is an "In Place" function. 
 		*/
+		//chprintf((BaseSequentialStream *) &SD3, "TEST \r\n");
 
 		doFFT_optimized(FFT_SIZE, micRight_cmplx_input);
 		doFFT_optimized(FFT_SIZE, micLeft_cmplx_input);
@@ -165,8 +156,108 @@ void processAudioData(int16_t *data, uint16_t num_samples){
 		nb_samples = 0;
 		mustSend++;
 
-		sound_remote(micLeft_output);
+
+
+		uint16_t freq_left = max_frequency(micLeft_output);
+		uint16_t freq_right = max_frequency(micRight_output);
+		uint16_t freq_front = max_frequency(micFront_output);
+		uint16_t freq_back = max_frequency(micBack_output);
+
+
+		//detection of the wanted frequency and check if all microphones have the same max frequency
+		if((abs(freq_left - FREQ_SENDER)<= MAX_ERROR) &&
+				(abs(freq_right - FREQ_SENDER)<= MAX_ERROR)&&
+				(abs(freq_front - FREQ_SENDER)<= MAX_ERROR)&&
+				(abs(freq_back - FREQ_SENDER)<= MAX_ERROR))
+		{
+			//changing the audio status to the case detected
+			audio_status = FREQ_1;
+			//computing the phases from the data of two mics and their difference
+			current_phase_diff_lr = atan2f(micLeft_cmplx_input[freq_left+1],micLeft_cmplx_input[freq_left])
+												-atan2f(micRight_cmplx_input[freq_right+1],micRight_cmplx_input[freq_right]);
+			current_phase_diff_fb = atan2f(micFront_cmplx_input[freq_front+1],micFront_cmplx_input[freq_front])
+												-atan2f(micBack_cmplx_input[freq_back+1],micBack_cmplx_input[freq_back]);
+
+			//moving average that only considers left and right microphone phase differences smaller than 1
+			if(fabs(current_phase_diff_lr)<1)
+			{
+				//all the old values in the circular buffer are pulled to the left
+				for (uint8_t i = 0; i < FILTER_SIZE-1; i++)
+				{
+					phase_diff_lr[i]=phase_diff_lr[i+1];
+				}
+
+				//the new value is put in the last index of the circular buffer
+				phase_diff_lr[FILTER_SIZE-1] = current_phase_diff_lr;
+
+				//here an average with linear weights, so the last new value is the most important
+				for (uint8_t i = 0; i < FILTER_SIZE-1; i++)
+				{
+					mov_avg_lr+=phase_diff_lr[i]*i;
+				}
+				mov_avg_lr /= FILTER_SIZE*(FILTER_SIZE+1)/2;
+
+
+			}
+
+			//here the same moving average principle is applied to phase differences between front and back
+			if(fabs(current_phase_diff_fb)<1)
+			{
+				for (uint8_t i = 0; i < FILTER_SIZE-1; i++)
+				{
+					phase_diff_fb[i]=phase_diff_fb[i+1];
+				}
+
+				//phase diffs between microphones
+				phase_diff_fb[FILTER_SIZE-1] = current_phase_diff_fb;
+
+				for (uint8_t i = 0; i < FILTER_SIZE-1; i++)
+				{
+					mov_avg_fb+=phase_diff_fb[i]*i;
+				}
+				mov_avg_fb /= FILTER_SIZE*(FILTER_SIZE+1)/2;
+			}
+
+		}
+		else if((abs(max_frequency(micLeft_output) - FREQ_RECIEVER)<= MAX_ERROR) &&
+				(abs(max_frequency(micRight_output) - FREQ_RECIEVER)<= MAX_ERROR)&&
+				(abs(max_frequency(micFront_output) - FREQ_RECIEVER)<= MAX_ERROR)&&
+				(abs(max_frequency(micBack_output) - FREQ_RECIEVER)<= MAX_ERROR))
+		{
+			audio_status = FREQ_2;
+
+		}
+		else
+		{
+			audio_status = NO_AUDIO;
+
+		}
 	}
+}
+
+
+uint8_t get_audio_status(void)
+{
+	return audio_status;
+}
+
+//returns the current angle
+float get_angle(void)
+{
+	if (audio_status == NO_AUDIO){return 0;}
+	angle=atan2f(mov_avg_lr,-(mov_avg_fb))*360.0f/(2.0f*PI);
+
+	return angle;
+}
+
+float get_lr(void){
+	//chprintf((BaseSequentialStream *) &SD3, "(RETURNING) = %f    \r\n", mov_avg_lr);
+	return mov_avg_lr;
+}
+
+float get_fb(void){
+	//chprintf((BaseSequentialStream *) &SD3, "(RETURNING) = %f    \r\n", mov_avg_lr);
+	return mov_avg_fb;
 }
 
 void wait_send_to_computer(void){
@@ -201,4 +292,8 @@ float* get_audio_buffer_ptr(BUFFER_NAME_t name){
 	else{
 		return NULL;
 	}
+}
+
+int sign(float x) {
+    return (x > 0) - (x < 0);
 }
