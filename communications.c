@@ -1,3 +1,10 @@
+/*
+
+File    : communications.c
+
+Code given in the EPFL MICRO-315 TP (Spring Semester 2020)
+*/
+
 #include "ch.h"
 #include "hal.h"
 #include <main.h>

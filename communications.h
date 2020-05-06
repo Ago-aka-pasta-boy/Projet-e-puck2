@@ -1,3 +1,10 @@
+/*
+
+File    : communications.h
+
+Code given in the EPFL MICRO-315 TP (Spring Semester 2020)
+*/
+
 #ifndef COMMUNICATIONS_H
 #define COMMUNICATIONS_H
 

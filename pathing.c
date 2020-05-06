@@ -156,10 +156,9 @@ void move_around_edge(uint8_t index)
 
 	while (!stop)
 	{
-		chThdSleepMilliseconds(100);
+		chThdSleepMilliseconds(150);
 		for(uint8_t i = 0 ; i < MAXLINES ; i++)
 		{
-			chThdSleepMilliseconds(50);
 			if (get_obstacle_type(i)==type) {stop=0; break;}
 			stop=1;
 		}

@@ -13,7 +13,6 @@
 #define TRAVEL_DISTANCE		150
 
 void set_speed(int speed);
-void reset_motors(void);
 void rotate_lr(int lr);
 void rotate_angle(float angle, uint16_t speed);
 uint8_t path_to_obstacle (uint8_t*index);

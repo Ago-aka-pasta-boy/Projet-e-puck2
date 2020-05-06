@@ -1,3 +1,10 @@
+/*
+
+File    : FFT.h
+
+Code given in the EPFL MICRO-315 TP (Spring Semester 2020)
+*/
+
 #ifndef FFT_H
 #define FFT_H
 
