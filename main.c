@@ -63,7 +63,6 @@ static void timer12_start(void){
 
 
 
-
 int main(void)
 {
 
@@ -95,14 +94,7 @@ int main(void)
     bool move_forward = 0;
     uint8_t obstacle_index = 0;
 
-    /* Infinite loop.
-    while (1)
-        {
-    	lr = get_lr();
-    	chThdSleepMilliseconds(1500);
-     //   chprintf((BaseSequentialStream *) &SD3, " (ANGLE) = %f      (LR) =%f  \r\n", get_angle(),lr);
-        }
-	*/
+
 
     while (1)
     {
