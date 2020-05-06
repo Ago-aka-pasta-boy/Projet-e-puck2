@@ -9,6 +9,8 @@ extern "C" {
 #include "msgbus/messagebus.h"
 #include "parameter/parameter.h"
 
+void SendUint8ToComputer(uint8_t* data, uint16_t size);
+
 
 /** Robot wide IPC bus. */
 extern messagebus_t bus;
