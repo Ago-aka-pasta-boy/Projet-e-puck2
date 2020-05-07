@@ -25,6 +25,9 @@ Adapted from the code given in the EPFL MICRO-315 TP (Spring Semester 2020)
 #include <sensors/VL53L0X/VL53L0X.h>
 #include <camera/po8030.h>
 
+#include <sensors/proximity.h>
+#include <msgbus/messagebus.h>
+
 #include <pathing.h>
 #include <process_image.h>
 #include <audio_processing.h>
@@ -32,6 +35,9 @@ Adapted from the code given in the EPFL MICRO-315 TP (Spring Semester 2020)
 #include <communications.h>
 #include <arm_math.h>
 
+messagebus_t bus;
+MUTEX_DECL(bus_lock);
+CONDVAR_DECL(bus_condvar);
 
 //Sends data to the computer for visualization and testing
 void SendUint8ToComputer(uint8_t* data, uint16_t size)
@@ -76,6 +82,7 @@ static void timer12_start(void)
 int sign(float x){return (x > 0) - (x < 0);}
 
 
+
 int main(void)
 {
 	//System and OS initializations
@@ -97,6 +104,10 @@ int main(void)
     dcmi_start();
     po8030_start();
 
+    //inits the proximity sensor
+    proximity_start();
+    messagebus_init(&bus, &bus_lock, &bus_condvar);
+
     //starts the image processing&capturing threads
     process_image_start();
 
@@ -108,13 +119,28 @@ int main(void)
     //FSM control variables
     bool move_forward = 0;
     uint8_t obstacle_index = 0;
+    float ang_=0, ang_f=0;
+    int dis = 0;
+
+
+//    while(1)
+//    {
+//
+//    	chThdSleepMilliseconds(500);
+//    	dis = get_prox(2);
+//    	chprintf((BaseSequentialStream *) &SD3, "dis: %d    \r\n", dis);
+//    	rotate_to_source();
+//    	set_speed(700);
+//
+//    }
+
 
     //Main FSM loop
     while (1)
     {
     	if (!move_forward)
     	{
-    	//rotate_to_source();
+    	rotate_to_source();
     	}
     	move_forward = FALSE;
     	if(path_to_obstacle(&obstacle_index))
@@ -129,6 +155,7 @@ int main(void)
 
 				case RIGHT_EDGE:
 					move_around_edge(obstacle_index);
+					move_forward = TRUE;
 					chThdSleepMilliseconds(1000);
 					break;
 

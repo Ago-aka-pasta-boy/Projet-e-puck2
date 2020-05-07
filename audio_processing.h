@@ -18,7 +18,6 @@ Adapted from the code given in the EPFL MICRO-315 TP (Spring Semester 2020)
 //Possible Audio states
 #define NO_AUDIO	0
 #define FREQ_1		1
-#define FREQ_2		2
 
 
 typedef enum {
@@ -34,6 +33,13 @@ typedef enum {
 	BACK_OUTPUT
 } BUFFER_NAME_t;
 
+
+//NEW
+void reset_audio (void);
+
+//TEST
+float get_fb(void);
+float get_lr(void);
 
 //Simple function used to detect the highest value in a buffer
 uint16_t max_frequency(float* data);

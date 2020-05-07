@@ -166,20 +166,47 @@ void extract_edges(uint8_t *buffer)
 void extract_gate(void)
 {
 	for(uint16_t i = 0 ; i < MAXLINES-1 ; i++)
+	{
+		if(current_obstacles[i].type==RIGHT_EDGE && current_obstacles[i+1].type==LEFT_EDGE)
 		{
-			if(current_obstacles[i].type==RIGHT_EDGE && current_obstacles[i+1].type==LEFT_EDGE)
+			current_obstacles[i].type = GATE;
+			current_obstacles[i].pos = (current_obstacles[i].pos + current_obstacles[i+1].pos)/2;
+			clear_obstacle(i+1);
+			break;
+		}
+	}
+}
+
+void choose_edge(void)
+{
+	uint8_t closer_edge = 0;
+	uint16_t dist_closer_edge =IMAGE_BUFFER_SIZE/2,  dist_index_edge;
+	if(current_obstacles[0].type!=GATE && current_obstacles[0].type!=GOAL)
+	{
+		for(uint8_t i = 0 ; i < MAXLINES ; i++)
+		{
+			if(current_obstacles[i].type==RIGHT_EDGE || current_obstacles[i].type==LEFT_EDGE)
 			{
-				current_obstacles[i].type = GATE;
-				current_obstacles[i].pos = (current_obstacles[i].pos + current_obstacles[i+1].pos)/2;
-				clear_obstacle(i+1);
+				dist_index_edge = abs(current_obstacles[i].pos-IMAGE_BUFFER_SIZE/2);
+				if(dist_index_edge<dist_closer_edge)
+				{
+					dist_closer_edge = dist_index_edge;
+					closer_edge = i;
+				}
 			}
 		}
+		if(closer_edge)
+		{
+			current_obstacles[0].type=current_obstacles[closer_edge].type;
+			current_obstacles[0].pos=current_obstacles[closer_edge].pos;
+		}
+	}
 }
 
 
 void extract_goal(void)
 {
-	for(uint16_t i = 0 ; i < MAXLINES-2; i++)
+	for(uint8_t i = 0 ; i < MAXLINES-2; i++)
 	{
 		if(!current_obstacles[i].type){return;}
 	}
@@ -255,6 +282,7 @@ static THD_FUNCTION(ProcessImage, arg) {
 		extract_edges(image_red);
 		extract_gate();
 		extract_goal();
+		choose_edge();
 
 
 		//TESTING
@@ -276,8 +304,6 @@ static THD_FUNCTION(ProcessImage, arg) {
 		}
 
 		send_to_computer = !send_to_computer;
-
-		chThdSleepMilliseconds(50);
     }
 }
 

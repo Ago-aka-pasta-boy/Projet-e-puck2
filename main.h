@@ -20,6 +20,8 @@ extern "C" {
 #include "msgbus/messagebus.h"
 #include "parameter/parameter.h"
 
+extern messagebus_t bus;
+
 
 //Sends data to the computer for visualization and testing
 void SendUint8ToComputer(uint8_t* data, uint16_t size);

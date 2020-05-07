@@ -24,14 +24,15 @@ Adapted from the code given in the EPFL MICRO-315 TP (Spring Semester 2020)
 #include <arm_math.h>
 
 //Defines
-#define FILTER_SIZE		30 //Size of the moving average filter's buffer
+//#define FILTER_SIZE		20 //Size of the moving average filter's buffer
+#define A				0.925f
+#define B				0.075f
 
 #define MIN_VALUE_THRESHOLD	10000 //Threshold value for the max_frequency function
 
-#define MIN_FREQ		25	//we don't analyze before this index to not use resources for nothing
-#define FREQ_SENDER		32 //1990
-#define FREQ_RECIEVER	38	//406Hz
-#define MAX_FREQ		38	//we don't analyze after this index to not use resources for nothing
+#define MIN_FREQ		59	//we don't analyze before this index to not use resources for nothing
+#define FREQ_SENDER		64 //32=488HZ 64=876 ?!? 976 bro :P
+#define MAX_FREQ		69	//we don't analyze after this index to not use resources for nothing
 #define MAX_ERROR		1	//frequency tolerance
 
 
@@ -50,11 +51,11 @@ static float micRight_output[FFT_SIZE];
 static float micFront_output[FFT_SIZE];
 static float micBack_output[FFT_SIZE];
 //Arrays containing the phase differences from the audio data
-static float phase_diff_lr[FILTER_SIZE] ={ 0};
-static float phase_diff_fb[FILTER_SIZE] ={ 0};
+static float phase_diff_lr;//[FILTER_SIZE] ={ 0};
+static float phase_diff_fb;//[FILTER_SIZE] ={ 0};
 //Current phase differences
-static float current_phase_diff_lr=0;
-static float current_phase_diff_fb=0;
+//static float current_phase_diff_lr=0;
+//static float current_phase_diff_fb=0;
 //Angle to the sound source
 static float angle = 0;
 //Moving averages for the phase differences
@@ -170,77 +171,82 @@ void processAudioData(int16_t *data, uint16_t num_samples)
 		uint16_t freq_back = max_frequency(micBack_output);
 
 
+		//CHECK ALL ARE SAME
+
+		//Introduce the microphone data directly into the motor functions (with cooefs)
+
+		//0.9*old + 0.1*new = new_filtered
+
 		//detection of the wanted frequency and check if all microphones have the same max frequency
-		if((abs(freq_left - FREQ_SENDER)<= MAX_ERROR) &&
-				(abs(freq_right - FREQ_SENDER)<= MAX_ERROR)&&
-				(abs(freq_front - FREQ_SENDER)<= MAX_ERROR)&&
-				(abs(freq_back - FREQ_SENDER)<= MAX_ERROR))
+		if((abs(freq_left - FREQ_SENDER)<= MAX_ERROR) && (freq_right == freq_left)&&
+				(freq_front == freq_left)&&	(freq_back == freq_left))
 		{
 			//changing the audio status to the case detected
 			audio_status = FREQ_1;
 			//computing the phases from the data of two mics and their difference
-			current_phase_diff_lr = atan2f(micLeft_cmplx_input[freq_left+1],micLeft_cmplx_input[freq_left])
+			phase_diff_lr = atan2f(micLeft_cmplx_input[freq_left+1],micLeft_cmplx_input[freq_left])
 												-atan2f(micRight_cmplx_input[freq_right+1],micRight_cmplx_input[freq_right]);
-			current_phase_diff_fb = atan2f(micFront_cmplx_input[freq_front+1],micFront_cmplx_input[freq_front])
+			phase_diff_fb = atan2f(micFront_cmplx_input[freq_front+1],micFront_cmplx_input[freq_front])
 												-atan2f(micBack_cmplx_input[freq_back+1],micBack_cmplx_input[freq_back]);
 
 			//moving average that only considers left and right microphone phase differences smaller than 1 to reject some noise
-			if(fabs(current_phase_diff_lr)<1)
+			if(fabs(phase_diff_lr)<1)
 			{
-				//all the old values in the circular buffer are pulled to the left
-				for (uint8_t i = 0; i < FILTER_SIZE-1; i++)
-				{
-					phase_diff_lr[i]=phase_diff_lr[i+1];
-				}
-
-				//the new value is put in the last index of the circular buffer
-				phase_diff_lr[FILTER_SIZE-1] = current_phase_diff_lr;
-
-				//here an average with linear weights, so the last new value is the most important
-				for (uint8_t i = 0; i < FILTER_SIZE; i++)
-				{
-					mov_avg_lr+=phase_diff_lr[i]*i;
-				}
-				mov_avg_lr /= FILTER_SIZE*(FILTER_SIZE+1)/2;
+//				//all the old values in the buffer are pulled to the left
+//				for (uint8_t i = 0; i < FILTER_SIZE-1; i++)
+//				{
+//					phase_diff_lr[i]=phase_diff_lr[i+1];
+//				}
+//
+//				//the new value is put in the last index of the buffer
+//				phase_diff_lr[FILTER_SIZE-1] = current_phase_diff_lr;
+//
+//				//here an average with linear weights, so the last new value is the most important
+//				for (uint8_t i = 0; i < FILTER_SIZE; i++)
+//				{
+//					mov_avg_lr+=phase_diff_lr[i];//*i;
+//				}
+//				mov_avg_lr /= FILTER_SIZE;//*(FILTER_SIZE+1)/2;
+				mov_avg_lr = A * mov_avg_lr + B * phase_diff_lr;
 
 
 			}
 
 			//here the same moving average principle is applied to phase differences between front and back
-			if(fabs(current_phase_diff_fb)<1)
+			if(fabs(phase_diff_fb)<1)
 			{
-				for (uint8_t i = 0; i < FILTER_SIZE-1; i++)
-				{
-					phase_diff_fb[i]=phase_diff_fb[i+1];
-				}
-
-				//phase differences between microphones
-				phase_diff_fb[FILTER_SIZE-1] = current_phase_diff_fb;
-
-				for (uint8_t i = 0; i < FILTER_SIZE; i++)
-				{
-					mov_avg_fb+=phase_diff_fb[i]*i;
-				}
-				mov_avg_fb /= FILTER_SIZE*(FILTER_SIZE+1)/2;
+//				for (uint8_t i = 0; i < FILTER_SIZE-1; i++)
+//				{
+//					phase_diff_fb[i]=phase_diff_fb[i+1];
+//				}
+//
+//				//phase differences between microphones
+//				phase_diff_fb[FILTER_SIZE-1] = current_phase_diff_fb;
+//
+//				for (uint8_t i = 0; i < FILTER_SIZE; i++)
+//				{
+//					mov_avg_fb+=phase_diff_fb[i];//*i;
+//				}
+//				mov_avg_fb /= FILTER_SIZE;//*(FILTER_SIZE+1)/2;
+				mov_avg_fb = A * mov_avg_fb + B * phase_diff_fb;
 			}
 
 		}
 
-		//????????????????????????????????????????????????????????????????????????????????
-		else if((abs(max_frequency(micLeft_output) - FREQ_RECIEVER)<= MAX_ERROR) &&
-				(abs(max_frequency(micRight_output) - FREQ_RECIEVER)<= MAX_ERROR)&&
-				(abs(max_frequency(micFront_output) - FREQ_RECIEVER)<= MAX_ERROR)&&
-				(abs(max_frequency(micBack_output) - FREQ_RECIEVER)<= MAX_ERROR))
-		{
-			audio_status = FREQ_2;
-
-		}
 		else
 		{
 			audio_status = NO_AUDIO;
 
 		}
 	}
+}
+
+
+//Resets the moving average
+void reset_audio (void)
+{
+	mov_avg_lr = 0;
+	mov_avg_fb = -0.5;
 }
 
 
@@ -266,6 +272,7 @@ float get_angle(void)
 //Returns the LR moving average - mostly for testing
 float get_lr(void)
 {
+	if (audio_status == NO_AUDIO){return 0;}
 	return mov_avg_lr;
 }
 
@@ -273,6 +280,7 @@ float get_lr(void)
 //Returns the FB moving average - mostly for testing
 float get_fb(void)
 {
+	if (audio_status == NO_AUDIO){return 0;}
 	return mov_avg_fb;
 }
 
