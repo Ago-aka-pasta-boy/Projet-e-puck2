@@ -49,7 +49,7 @@ void move_back (void)
 }
 
 
-uint8_t path_to_obstacle (uint8_t*index)
+uint8_t path_to_obstacle (void)
 {
 	uint8_t last_type = 0, count=0, current_obstacle = 0;
 	uint16_t last_pos=0, start_distance=VL53L0X_get_dist_mm();
@@ -59,20 +59,16 @@ uint8_t path_to_obstacle (uint8_t*index)
 
 	while(chVTGetSystemTime()<start_time + TRAVEL_TIME)
 	{
-		for(uint8_t i = 0 ; i < MAXLINES; i++)
-		{
-			if (get_obstacle_type(i) && get_obstacle_type(i)!=UNKNOWN)
+			if (get_obstacle_type() && get_obstacle_type()!=UNKNOWN)
 			{
-				//current_obstacle = i;
-
-				if (get_obstacle_type(i)==last_type && abs(last_pos-get_obstacle_pos(i)) < 50 && VL53L0X_get_dist_mm() < 150)
+				if (get_obstacle_type()==last_type && abs(last_pos-get_obstacle_pos()) < 50 && VL53L0X_get_dist_mm() < 100)
 				{
 					count++;
 				}
 				else{count=0;}
 
-				last_type = get_obstacle_type(i);
-				last_pos = get_obstacle_pos(i);
+				last_type = get_obstacle_type();
+				last_pos = get_obstacle_pos();
 
 				//chprintf((BaseSequentialStream *) &SD3, "(COUNT): %d  \r\n", count);
 
@@ -82,18 +78,16 @@ uint8_t path_to_obstacle (uint8_t*index)
 					//chprintf((BaseSequentialStream *) &SD3, "\n FOUND EDGE  \r\n", count);
 
 					set_speed(0);
-					*index = i;
 					set_body_led(0);
 					return TRUE;
 				}
 			}
-		}
+
 
 
 
 		if(VL53L0X_get_dist_mm()<SAFETY_DISTANCE) //|| get_prox(1) > 200 || get_prox(2) > 200 || get_prox(7) > 200 || get_prox(8) > 200)
 		{
-
 			set_body_led(0);
 			move_back();
 			return FALSE;
@@ -107,13 +101,9 @@ uint8_t path_to_obstacle (uint8_t*index)
 		{
 			set_speed(600);
 		}
-
-
-
 	}
 	set_speed(0);
 	set_body_led(0);
-	chThdSleepMilliseconds(500);
 	return FALSE;
 }
 
@@ -155,51 +145,46 @@ void rotate_to_source (void)
 }
 
 
-void move_around_edge(uint8_t index)
+void move_around_edge(void)
 {
-	rotate_lr((get_obstacle_type(index)*2-3)*300);
-	uint8_t stop = 0, type = get_obstacle_type(index);
+	rotate_lr((get_obstacle_type()*2-3)*300);
+	uint8_t stop = 0, type = get_obstacle_type();
 
 	set_led(LED3, 1);
 	set_led(LED7, 1);
 
-	while (!stop)
+	while (type == get_obstacle_type())
 	{
-		chThdSleepMilliseconds(150);
-		for(uint8_t i = 0 ; i < MAXLINES ; i++)
-		{
-			if (get_obstacle_type(i)==type) {stop=0; break;}
-			stop=1;
-		}
+		chThdSleepMilliseconds(100);
 	}
-	chThdSleepMilliseconds(400);
+	chThdSleepMilliseconds(500);
 	set_speed(0);
 	set_led(LED3, 0);
 	set_led(LED7, 0);
 }
 
-void move_through_gate(uint8_t index)
+void move_through_gate(void)
 {
-	rotate_lr(sign(IMAGE_BUFFER_SIZE/2-get_obstacle_pos(index))*100);
-	while(abs(IMAGE_BUFFER_SIZE/2-get_obstacle_pos(index))<10)
+	rotate_lr(sign(IMAGE_BUFFER_SIZE/2-get_obstacle_pos())*100);
+	while(abs(IMAGE_BUFFER_SIZE/2-get_obstacle_pos())<10)
 	{
 		chThdSleepMilliseconds(100);
 	}
 	set_speed(0);
 	chThdSleepMilliseconds(1000);
-	set_speed(1500);
+	set_speed(1000);
 
 	while(VL53L0X_get_dist_mm()>COLLISION_DISTANCE)
 	{
 		chThdSleepMilliseconds(100);
 	}
 
-	chThdSleepMilliseconds(500);
+	chThdSleepMilliseconds(1000);
 
 	set_speed(0);
 }
 
-void move_to_goal(uint8_t index)
+void move_to_goal(void)
 {
 	rotate_lr(300);
 	chThdSleepMilliseconds(5000);

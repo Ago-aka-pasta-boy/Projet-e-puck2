@@ -139,14 +139,15 @@ void extract_edges(uint8_t *buffer)
 
 			if(left_mean < current_lines[i].meanval && right_mean < current_lines[i].meanval)
 			{
-				if(left_mean > 2*right_mean && left_mean > 0.3*current_lines[i].meanval)
-				{
-					current_obstacles[edge_index].type = LEFT_EDGE;
-					current_obstacles[edge_index].pos = current_lines[i].pos;
-				}
-				else if(right_mean > 2*left_mean && right_mean > 0.3*current_lines[i].meanval)
+
+				if(right_mean > 2*left_mean && right_mean > 0.3*current_lines[i].meanval)
 				{
 					current_obstacles[edge_index].type = RIGHT_EDGE;
+					current_obstacles[edge_index].pos = current_lines[i].pos;
+				}
+				else if(left_mean > 2*right_mean && left_mean > 0.3*current_lines[i].meanval)
+				{
+					current_obstacles[edge_index].type = LEFT_EDGE;
 					current_obstacles[edge_index].pos = current_lines[i].pos;
 				}
 				else
@@ -307,12 +308,12 @@ static THD_FUNCTION(ProcessImage, arg) {
     }
 }
 
-uint8_t get_obstacle_type(uint8_t index){
-	return current_obstacles[index].type;
+uint8_t get_obstacle_type(void){
+	return current_obstacles[0].type;
 }
 
-uint16_t get_obstacle_pos(uint8_t index){
-	return current_obstacles[index].pos;
+uint16_t get_obstacle_pos(void){
+	return current_obstacles[0].pos;
 }
 
 

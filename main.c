@@ -144,34 +144,35 @@ int main(void)
     	rotate_to_source();
     	}
     	move_forward = FALSE;
-    	if(path_to_obstacle(&obstacle_index))
+    	if(path_to_obstacle())
     	{
-			switch (get_obstacle_type(obstacle_index))
+			switch (get_obstacle_type())
 			{
 				case LEFT_EDGE:
-					move_around_edge(obstacle_index);
+					move_around_edge();
 					move_forward = TRUE;
 					chThdSleepMilliseconds(1000);
 					break;
 
 				case RIGHT_EDGE:
-					move_around_edge(obstacle_index);
+					move_around_edge();
 					move_forward = TRUE;
 					chThdSleepMilliseconds(1000);
 					break;
 
 				case GATE:
-					move_through_gate(obstacle_index);
+					move_through_gate();
 					chThdSleepMilliseconds(1000);
 					break;
 
 				case GOAL:
-					move_to_goal(obstacle_index);
+					move_to_goal();
 					chThdSleepMilliseconds(1000);
 					break;
 			}
     	}
     }
+    chprintf((BaseSequentialStream *) &SD3, "LEAVING MAIN    \r\n");
 }
 
 //Stack Guard
