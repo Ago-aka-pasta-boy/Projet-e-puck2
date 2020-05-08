@@ -290,7 +290,7 @@ static THD_FUNCTION(ProcessImage, arg) {
 		{
 			if (current_obstacles[i].type != 0 && current_obstacles[i].type != UNKNOWN)
 			{
-				//chprintf((BaseSequentialStream *) &SD3, "(OBSTACLE_INDEX) = %d   TYPE: %d    POS:%d   \r\n", i, current_obstacles[i].type, current_obstacles[i].pos);
+				chprintf((BaseSequentialStream *) &SD3, "(OBSTACLE_INDEX) = %d   TYPE: %d    POS:%d   \r\n", i, current_obstacles[i].type, current_obstacles[i].pos);
 			}
 		}
 

@@ -40,7 +40,7 @@ void move_back (void)
 {
 	set_led(LED1, 1);
 	set_speed(-400);
-	while(VL53L0X_get_dist_mm()<80 && get_prox(1) > 180 && get_prox(2) > 180 && get_prox(7) > 180 && get_prox(8) > 180)
+	while(VL53L0X_get_dist_mm()<80) //&& get_prox(1) > 180 && get_prox(2) > 180 && get_prox(7) > 180 && get_prox(8) > 180)
 	{
 		chThdSleepMilliseconds(100);
 	}
@@ -51,7 +51,7 @@ void move_back (void)
 
 uint8_t path_to_obstacle (uint8_t*index)
 {
-	uint8_t last_type = 0, count=0;
+	uint8_t last_type = 0, count=0, current_obstacle = 0;
 	uint16_t last_pos=0, start_distance=VL53L0X_get_dist_mm();
 	systime_t start_time=chVTGetSystemTime();
 
@@ -59,26 +59,12 @@ uint8_t path_to_obstacle (uint8_t*index)
 
 	while(chVTGetSystemTime()<start_time + TRAVEL_TIME)
 	{
-		if(VL53L0X_get_dist_mm()<SAFETY_DISTANCE || get_prox(1) > 200 || get_prox(2) > 200 || get_prox(7) > 200 || get_prox(8) > 200)
-		{
-			set_body_led(0);
-			move_back();
-			return FALSE;
-		}
-
-		if(VL53L0X_get_dist_mm()<200)
-		{
-			set_speed(300);
-		}
-		else
-		{
-			set_speed(600);
-		}
-
 		for(uint8_t i = 0 ; i < MAXLINES; i++)
 		{
 			if (get_obstacle_type(i) && get_obstacle_type(i)!=UNKNOWN)
 			{
+				//current_obstacle = i;
+
 				if (get_obstacle_type(i)==last_type && abs(last_pos-get_obstacle_pos(i)) < 50 && VL53L0X_get_dist_mm() < 150)
 				{
 					count++;
@@ -96,14 +82,33 @@ uint8_t path_to_obstacle (uint8_t*index)
 					//chprintf((BaseSequentialStream *) &SD3, "\n FOUND EDGE  \r\n", count);
 
 					set_speed(0);
-					chThdSleepMilliseconds(500);
 					*index = i;
 					set_body_led(0);
 					return TRUE;
 				}
-				break;
 			}
 		}
+
+
+
+		if(VL53L0X_get_dist_mm()<SAFETY_DISTANCE) //|| get_prox(1) > 200 || get_prox(2) > 200 || get_prox(7) > 200 || get_prox(8) > 200)
+		{
+
+			set_body_led(0);
+			move_back();
+			return FALSE;
+		}
+
+		if(VL53L0X_get_dist_mm()<200)
+		{
+			set_speed(300);
+		}
+		else
+		{
+			set_speed(600);
+		}
+
+
 
 	}
 	set_speed(0);
@@ -129,7 +134,7 @@ void rotate_to_source (void)
 	{
 		check_angle=0;
 		turnangle = get_angle();
-		chprintf((BaseSequentialStream *) &SD3, "ANGLE %f  \r\n", turnangle);
+		//chprintf((BaseSequentialStream *) &SD3, "ANGLE %f  \r\n", turnangle);
 		rotate_lr(ROT_COEF*turnangle);
 		chThdSleepMilliseconds(500);
 		set_speed(0);
