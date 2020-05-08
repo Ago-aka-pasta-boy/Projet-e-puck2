@@ -16,12 +16,12 @@
 
 void set_speed(int speed);
 void rotate_lr(int lr);
-uint8_t path_to_obstacle (uint8_t*index);
+uint8_t path_to_obstacle(void);
 void rotate_to_source (void);
 void move_back (void);
-void move_around_edge(uint8_t index);
-void move_through_gate(uint8_t index);
-void move_to_goal(uint8_t index);
+void move_around_edge(void);
+void move_through_gate(void);
+void move_to_goal(void);
 
 
 

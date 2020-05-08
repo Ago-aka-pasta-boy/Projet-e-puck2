@@ -50,9 +50,9 @@ void extract_goal(void);
 
 void clear_obstacle(uint8_t i);
 
-uint8_t get_obstacle_type(uint8_t index);
+uint8_t get_obstacle_type(void);
 
-uint16_t get_obstacle_pos(uint8_t index);
+uint16_t get_obstacle_pos(void);
 
 
 float get_distance_cm(void);
