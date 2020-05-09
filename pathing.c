@@ -20,6 +20,10 @@
 #include <audio_processing.h>
 #include "leds.h"
 
+static uint8_t last_type=0;
+static uint8_t count=0;
+static uint16_t last_pos=0;
+
 void set_speed(int speed)
 {
 	left_motor_set_speed(speed);
@@ -49,42 +53,41 @@ void move_back (void)
 }
 
 
+uint8_t recognize_obstacle(void)
+{
+	if (get_obstacle_type() && get_obstacle_type()!=UNKNOWN)
+	{
+		if (get_obstacle_type()==last_type && abs(last_pos-get_obstacle_pos()) < 50 )
+		{
+			count++;
+		}
+		else{count=0;}
+
+		last_type = get_obstacle_type();
+		last_pos = get_obstacle_pos();
+
+		if ((count>3 || (count>1 && last_type == GATE)) && VL53L0X_get_dist_mm() < 100)
+		{
+			return last_type;
+		}
+	}
+	return FALSE;
+}
+
 uint8_t path_to_obstacle (void)
 {
-	uint8_t last_type = 0, count=0, current_obstacle = 0;
-	uint16_t last_pos=0, start_distance=VL53L0X_get_dist_mm();
 	systime_t start_time=chVTGetSystemTime();
 
 	set_body_led(1);
 
 	while(chVTGetSystemTime()<start_time + TRAVEL_TIME)
 	{
-			if (get_obstacle_type() && get_obstacle_type()!=UNKNOWN)
-			{
-				if (get_obstacle_type()==last_type && abs(last_pos-get_obstacle_pos()) < 50 && VL53L0X_get_dist_mm() < 100)
-				{
-					count++;
-				}
-				else{count=0;}
-
-				last_type = get_obstacle_type();
-				last_pos = get_obstacle_pos();
-
-				//chprintf((BaseSequentialStream *) &SD3, "(COUNT): %d  \r\n", count);
-
-
-				if (count>3 || (count>1 && (last_type == GATE || last_type == GOAL)))
-				{
-					//chprintf((BaseSequentialStream *) &SD3, "\n FOUND EDGE  \r\n", count);
-
-					set_speed(0);
-					set_body_led(0);
-					return TRUE;
-				}
-			}
-
-
-
+		if (recognize_obstacle())
+		{
+			set_speed(0);
+			set_body_led(0);
+			return last_type;
+		}
 
 		if(VL53L0X_get_dist_mm()<SAFETY_DISTANCE) //|| get_prox(1) > 200 || get_prox(2) > 200 || get_prox(7) > 200 || get_prox(8) > 200)
 		{
@@ -99,7 +102,7 @@ uint8_t path_to_obstacle (void)
 		}
 		else
 		{
-			set_speed(600);
+			set_speed(500);
 		}
 	}
 	set_speed(0);
@@ -108,7 +111,7 @@ uint8_t path_to_obstacle (void)
 }
 
 
-void rotate_to_source (void)
+uint8_t rotate_to_source (void)
 {
 	float turnangle = 0;
 	uint8_t check_angle = 0;
@@ -138,10 +141,12 @@ void rotate_to_source (void)
 
 			if (fabs(turnangle) < 15.0f && get_audio_status()){check_angle++;}
 
-			if (check_angle>5){ return;}
+			if (recognize_obstacle()){return last_type;}
+			if (check_angle>5){ return FALSE;}
 		}
 
 	}
+	return FALSE;
 }
 
 
@@ -165,11 +170,6 @@ void move_around_edge(void)
 
 void move_through_gate(void)
 {
-	rotate_lr(sign(IMAGE_BUFFER_SIZE/2-get_obstacle_pos())*100);
-	while(abs(IMAGE_BUFFER_SIZE/2-get_obstacle_pos())<10)
-	{
-		chThdSleepMilliseconds(100);
-	}
 	set_speed(0);
 	chThdSleepMilliseconds(1000);
 	set_speed(1000);
@@ -179,7 +179,7 @@ void move_through_gate(void)
 		chThdSleepMilliseconds(100);
 	}
 
-	chThdSleepMilliseconds(1000);
+	chThdSleepMilliseconds(700);
 
 	set_speed(0);
 }

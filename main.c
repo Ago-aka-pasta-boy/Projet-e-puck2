@@ -35,9 +35,7 @@ Adapted from the code given in the EPFL MICRO-315 TP (Spring Semester 2020)
 #include <communications.h>
 #include <arm_math.h>
 
-messagebus_t bus;
-MUTEX_DECL(bus_lock);
-CONDVAR_DECL(bus_condvar);
+static uint8_t obstacle_type = 0;
 
 //Sends data to the computer for visualization and testing
 void SendUint8ToComputer(uint8_t* data, uint16_t size)
@@ -104,10 +102,6 @@ int main(void)
     dcmi_start();
     po8030_start();
 
-    //inits the proximity sensor
-    proximity_start();
-    messagebus_init(&bus, &bus_lock, &bus_condvar);
-
     //starts the image processing&capturing threads
     process_image_start();
 
@@ -118,7 +112,7 @@ int main(void)
 
     //FSM control variables
     bool move_forward = 0;
-    uint8_t obstacle_index = 0;
+
     float ang_=0, ang_f=0;
     int dis = 0;
 
@@ -139,14 +133,16 @@ int main(void)
     //Main FSM loop
     while (1)
     {
+    	obstacle_type=0;
     	if (!move_forward)
     	{
-    	rotate_to_source();
+    	obstacle_type=rotate_to_source();
     	}
     	move_forward = FALSE;
-    	if(path_to_obstacle())
+    	obstacle_type=path_to_obstacle();
+    	if(obstacle_type)
     	{
-			switch (get_obstacle_type())
+			switch (obstacle_type)
 			{
 				case LEFT_EDGE:
 					move_around_edge();

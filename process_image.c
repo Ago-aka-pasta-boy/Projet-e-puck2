@@ -20,6 +20,32 @@ static BSEMAPHORE_DECL(image_ready_sem, TRUE);
  *  Returns 0 if line not found
  */
 
+void clear_all_lines(void)
+{
+	for(uint16_t i = 0 ; i < MAXLINES ; i++)
+		{
+			current_lines[i].exist=FALSE;
+			current_lines[i].start=0;
+			current_lines[i].end=0;
+			current_lines[i].pos=0;
+		}
+}
+
+void clear_all_obstacles(void)
+{
+	for(uint16_t i = 0 ; i < MAXLINES ; i++)
+	{
+		current_obstacles[i].type=0;
+		current_obstacles[i].pos=0;
+	}
+}
+
+void clear_obstacle(uint8_t i)
+{
+	current_obstacles[i].type=0;
+	current_obstacles[i].pos=0;
+}
+
 void extract_lines(uint8_t *buffer){
 
 
@@ -43,11 +69,11 @@ void extract_lines(uint8_t *buffer){
 
 	//chprintf((BaseSequentialStream *) &SD3, "(MAXVAL) = %d \r\n", maxval);
 
-	if(!maxval){return;}
+	if(maxval<70){return;}
 	mean = maxval*0.7;
 
 	//clears the line array
-	clear_lines();
+	clear_all_lines();
 
 
 	i = 0;
@@ -94,12 +120,6 @@ void extract_lines(uint8_t *buffer){
 
 
 	}
-
-	for(uint16_t i = 0 ; i < MAXLINES ; i++){
-		//chThdSleepMilliseconds(500);
-		//chprintf((BaseSequentialStream *) &SD3, "(INDEX) = %d   START: %d    END:%d   MEANVAL: %d \r\n", i, current_lines[i].start, current_lines[i].end, current_lines[i].meanval);
-		}
-
 }
 
 
@@ -107,13 +127,9 @@ void extract_edges(uint8_t *buffer)
 {
 
 	uint8_t edge_index=0;
-	uint16_t i = 0,  j = 0, left_mean = 0, right_mean = 0;
+	uint16_t left_mean = 0, right_mean = 0;
 
-	for(uint16_t i = 0 ; i < MAXLINES ; i++)
-	{
-		current_obstacles[i].type=0;
-		current_obstacles[i].pos=0;
-	}
+	clear_all_obstacles();
 
 
 	for(uint16_t i = 0 ; i < MAXLINES ; i++)
@@ -161,68 +177,52 @@ void extract_gate(void)
 	{
 		if(current_obstacles[i].type==RIGHT_EDGE && current_obstacles[i+1].type==LEFT_EDGE)
 		{
-			current_obstacles[i].type = GATE;
-			current_obstacles[i].pos = (current_obstacles[i].pos + current_obstacles[i+1].pos)/2;
-			clear_obstacle(i+1);
+			current_obstacles[0].type = GATE;
+			current_obstacles[0].pos = (current_obstacles[i].pos + current_obstacles[i+1].pos)/2;
 			break;
 		}
 	}
 }
 
-void choose_edge(void)
-{
-	uint8_t closer_edge = 0;
-	uint16_t dist_closer_edge =IMAGE_BUFFER_SIZE/2,  dist_index_edge;
-	if(current_obstacles[0].type!=GATE && current_obstacles[0].type!=GOAL)
-	{
-		for(uint8_t i = 0 ; i < MAXLINES ; i++)
-		{
-			if(current_obstacles[i].type==RIGHT_EDGE || current_obstacles[i].type==LEFT_EDGE)
-			{
-				dist_index_edge = abs(current_obstacles[i].pos-IMAGE_BUFFER_SIZE/2);
-				if(dist_index_edge<dist_closer_edge)
-				{
-					dist_closer_edge = dist_index_edge;
-					closer_edge = i;
-				}
-			}
-		}
-		if(closer_edge)
-		{
-			current_obstacles[0].type=current_obstacles[closer_edge].type;
-			current_obstacles[0].pos=current_obstacles[closer_edge].pos;
-		}
-	}
-}
+//void choose_edge(void)
+//{
+//	uint8_t closer_edge = 0;
+//	uint16_t dist_closer_edge =IMAGE_BUFFER_SIZE/2,  dist_index_edge;
+//	if(current_obstacles[0].type!=GATE && current_obstacles[0].type!=GOAL)
+//	{
+//		for(uint8_t i = 0 ; i < MAXLINES ; i++)
+//		{
+//			if(current_obstacles[i].type==RIGHT_EDGE || current_obstacles[i].type==LEFT_EDGE)
+//			{
+//				dist_index_edge = abs(current_obstacles[i].pos-IMAGE_BUFFER_SIZE/2);
+//				if(dist_index_edge<dist_closer_edge)
+//				{
+//					dist_closer_edge = dist_index_edge;
+//					closer_edge = i;
+//				}
+//			}
+//		}
+//		if(closer_edge)
+//		{
+//			current_obstacles[0].type=current_obstacles[closer_edge].type;
+//			current_obstacles[0].pos=current_obstacles[closer_edge].pos;
+//		}
+//	}
+//}
 
 
 void extract_goal(void)
 {
-	for(uint8_t i = 0 ; i < MAXLINES-2; i++)
+	uint8_t line_count = 0;
+	for(uint8_t i = 0 ; i < MAXLINES-1; i++)
 	{
-		if(!current_obstacles[i].type){return;}
+		if(current_lines[i].exist){line_count++;}
 	}
+	if (line_count > 2)
+	{
 	current_obstacles[0].type = GOAL;
 	current_obstacles[0].pos = current_obstacles[1].pos;
-
-	for(uint16_t i = 1 ; i < MAXLINES; i++){clear_obstacle(i);}
-}
-
-void clear_lines()
-{
-	for(uint16_t i = 0 ; i < MAXLINES ; i++)
-		{
-			current_lines[i].exist=FALSE;
-			current_lines[i].start=0;
-			current_lines[i].end=0;
-			current_lines[i].pos=0;
-		}
-}
-
-void clear_obstacle(uint8_t i)
-{
-	current_obstacles[i].type=0;
-	current_obstacles[i].pos=0;
+	}
 }
 
 
@@ -262,6 +262,10 @@ static THD_FUNCTION(ProcessImage, arg) {
 
 	bool send_to_computer = TRUE;
 
+//	clear_all_lines();
+//	clear_all_obstacles();
+
+
     while(1){
     	//waits until an image has been captured
         chBSemWait(&image_ready_sem);
@@ -278,21 +282,19 @@ static THD_FUNCTION(ProcessImage, arg) {
 		}
 
 
-
 		//search for a line in the image and gets its width in pixels
 		extract_lines(image_red);
 		extract_edges(image_red);
 		extract_gate();
+		//choose_edge();
 		extract_goal();
-		choose_edge();
-
 
 		//TESTING
 		for(uint16_t i = 0 ; i < MAXLINES; i++)
 		{
 			if (current_obstacles[i].type != 0 && current_obstacles[i].type != UNKNOWN)
 			{
-				chprintf((BaseSequentialStream *) &SD3, "(OBSTACLE_INDEX) = %d   TYPE: %d    POS:%d   \r\n", i, current_obstacles[i].type, current_obstacles[i].pos);
+				//chprintf((BaseSequentialStream *) &SD3, "(OBSTACLE_INDEX) = %d   TYPE: %d    POS:%d   \r\n", i, current_obstacles[i].type, current_obstacles[i].pos);
 			}
 		}
 
@@ -302,7 +304,7 @@ static THD_FUNCTION(ProcessImage, arg) {
 
 		if (send_to_computer)
 		{
-			//SendUint8ToComputer(image_red, IMAGE_BUFFER_SIZE);
+			SendUint8ToComputer(image_red, IMAGE_BUFFER_SIZE);
 		}
 
 		send_to_computer = !send_to_computer;
