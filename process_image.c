@@ -47,14 +47,7 @@ void extract_lines(uint8_t *buffer){
 	mean = maxval*0.7;
 
 	//clears the line array
-	for(uint16_t i = 0 ; i < MAXLINES ; i++)
-	{
-		current_lines[i].exist=FALSE;
-		current_lines[i].start=0;
-		current_lines[i].end=0;
-		current_lines[i].width=0;
-	}
-
+	clear_lines();
 
 
 	i = 0;
@@ -88,8 +81,7 @@ void extract_lines(uint8_t *buffer){
 		        {
 		        	current_lines[line_index].exist = TRUE;
 		        	current_lines[line_index].end = i;
-		        	current_lines[line_index].pos = (current_lines[line_index].start + current_lines[line_index].end)/2;
-		        	current_lines[line_index].width = current_lines[line_index].end - current_lines[line_index].start;
+		        	current_lines[line_index].pos = current_lines[line_index].end - current_lines[line_index].start;
 		        	current_lines[line_index].meanval = (buffer[current_lines[line_index].start+WIDTH_SLOPE] + buffer[current_lines[line_index].end-WIDTH_SLOPE])/2;
 		        	line_index++;
 
@@ -121,7 +113,6 @@ void extract_edges(uint8_t *buffer)
 	{
 		current_obstacles[i].type=0;
 		current_obstacles[i].pos=0;
-		current_obstacles[i].width=0;
 	}
 
 
@@ -217,11 +208,21 @@ void extract_goal(void)
 	for(uint16_t i = 1 ; i < MAXLINES; i++){clear_obstacle(i);}
 }
 
+void clear_lines()
+{
+	for(uint16_t i = 0 ; i < MAXLINES ; i++)
+		{
+			current_lines[i].exist=FALSE;
+			current_lines[i].start=0;
+			current_lines[i].end=0;
+			current_lines[i].pos=0;
+		}
+}
+
 void clear_obstacle(uint8_t i)
 {
 	current_obstacles[i].type=0;
 	current_obstacles[i].pos=0;
-	current_obstacles[i].width=0;
 }
 
 

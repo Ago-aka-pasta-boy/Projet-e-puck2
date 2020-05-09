@@ -134,7 +134,7 @@ int main(void)
 //
 //    }
 //
-//    while(1){chThdSleepMilliseconds(100);}
+//while(1){chThdSleepMilliseconds(100);}
 
     //Main FSM loop
     while (1)

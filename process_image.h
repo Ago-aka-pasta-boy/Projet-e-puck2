@@ -32,7 +32,6 @@ struct line {
 	uint16_t start;
 	uint16_t end;
 	uint16_t pos;
-	uint16_t width;
 	uint16_t meanval;
 };
 
@@ -40,7 +39,6 @@ struct line {
 struct obstacle{
 	uint8_t type;
 	uint16_t pos;
-	uint16_t width;
 };
 
 void extract_lines(uint8_t *buffer);
