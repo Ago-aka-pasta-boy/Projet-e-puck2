@@ -20,17 +20,11 @@ extern "C" {
 #include "msgbus/messagebus.h"
 #include "parameter/parameter.h"
 
-extern messagebus_t bus;
 
 
 //Sends data to the computer for visualization and testing
 void SendUint8ToComputer(uint8_t* data, uint16_t size);
 
-//Starts the serial communication
-static void serial_start(void);
-
-//General Purpose Timer configuration
-static void timer12_start(void);
 
 //Short sign(x) function
 int sign(float x);

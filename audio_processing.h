@@ -19,7 +19,6 @@ Adapted from the code given in the EPFL MICRO-315 TP (Spring Semester 2020)
 #define NO_AUDIO	0
 #define FREQ_1		1
 
-
 typedef enum {
 	//2 times FFT_SIZE because these arrays contain complex numbers (real + imaginary)
 	LEFT_CMPLX_INPUT = 0,
@@ -41,8 +40,6 @@ void reset_audio (void);
 float get_fb(void);
 float get_lr(void);
 
-//Simple function used to detect the highest value in a buffer
-uint16_t max_frequency(float* data);
 
 //Main audio processing function
 void processAudioData(int16_t *data, uint16_t num_samples);
@@ -53,10 +50,5 @@ uint8_t get_audio_status(void);
 //Returns the current angle
 float get_angle(void);
 
-//Puts the invoking thread into sleep until it can process the audio datas
-void wait_send_to_computer(void);
-
-//Returns the pointers for the audio buffers
-float* get_audio_buffer_ptr(BUFFER_NAME_t name);
 
 #endif /* AUDIO_PROCESSING_H */

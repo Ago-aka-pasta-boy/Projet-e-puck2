@@ -12,7 +12,6 @@
 #include <chprintf.h>
 #include <arm_math.h>
 
-#include <sensors/proximity.h>
 #include <sensors/VL53L0X/VL53L0X.h>
 #include <pathing.h>
 #include <motors.h>
@@ -20,8 +19,7 @@
 #include <audio_processing.h>
 #include "leds.h"
 
-static uint8_t last_type=0;
-static uint8_t count=0;
+static uint8_t last_type=0, count=0;
 static uint16_t last_pos=0;
 
 void set_speed(int speed)
@@ -33,8 +31,7 @@ void set_speed(int speed)
 
 void rotate_lr(int lr)
 {
-	if(abs(lr)<175){lr =sign(lr)*175;}
-	if(abs(lr)>1500){lr =sign(lr)*1500;}
+	if(abs(lr)<MINIMUM_ROT_SPEED){lr =sign(lr)*MINIMUM_ROT_SPEED;}
 	left_motor_set_speed(lr);
 	right_motor_set_speed(-lr);
 }
@@ -43,12 +40,12 @@ void rotate_lr(int lr)
 void move_back (void)
 {
 	set_led(LED1, 1);
-	set_speed(-400);
-	while(VL53L0X_get_dist_mm()<80) //&& get_prox(1) > 180 && get_prox(2) > 180 && get_prox(7) > 180 && get_prox(8) > 180)
+	set_speed(-SLOW_SPEED);		// it was at 400, not SLOW_SPEED that is 300
+	while(VL53L0X_get_dist_mm()<TOO_CLOSE)
 	{
-		chThdSleepMilliseconds(100);
+		chThdSleepMilliseconds(SENSOR_REFRESH_DELAY);
 	}
-	set_speed(0);
+	set_speed(HALT);
 	set_led(LED1, 0);
 }
 
@@ -57,7 +54,7 @@ uint8_t recognize_obstacle(void)
 {
 	if (get_obstacle_type() && get_obstacle_type()!=UNKNOWN)
 	{
-		if (get_obstacle_type()==last_type && abs(last_pos-get_obstacle_pos()) < 50 )
+		if (get_obstacle_type()==last_type && abs(last_pos-get_obstacle_pos()) < MAX_POS_SHIFT )
 		{
 			count++;
 		}
@@ -66,7 +63,7 @@ uint8_t recognize_obstacle(void)
 		last_type = get_obstacle_type();
 		last_pos = get_obstacle_pos();
 
-		if ((count>3 || (count>1 && last_type == GATE)) && VL53L0X_get_dist_mm() < 100)
+		if ((count>THRESHOLD_EDGE_AND_GOAL || (count>THRESHOLD_GATE && last_type == GATE)) && VL53L0X_get_dist_mm() < MAX_DIST_TO_CONSIDER)
 		{
 			return last_type;
 		}
@@ -84,28 +81,28 @@ uint8_t path_to_obstacle (void)
 	{
 		if (recognize_obstacle())
 		{
-			set_speed(0);
+			set_speed(HALT);
 			set_body_led(0);
 			return last_type;
 		}
 
-		if(VL53L0X_get_dist_mm()<SAFETY_DISTANCE) //|| get_prox(1) > 200 || get_prox(2) > 200 || get_prox(7) > 200 || get_prox(8) > 200)
+		if(VL53L0X_get_dist_mm()<SAFETY_DISTANCE)
 		{
 			set_body_led(0);
 			move_back();
 			return FALSE;
 		}
 
-		if(VL53L0X_get_dist_mm()<200)
+		if(VL53L0X_get_dist_mm()<SLOW_DOWN_DISTANCE)
 		{
-			set_speed(300);
+			set_speed(SLOW_SPEED);
 		}
 		else
 		{
-			set_speed(500);
+			set_speed(FAST_SPEED);
 		}
 	}
-	set_speed(0);
+	set_speed(HALT);
 	set_body_led(0);
 	return FALSE;
 }
@@ -120,29 +117,28 @@ uint8_t rotate_to_source (void)
 	chThdSleepMilliseconds(1000);
 
 	while(!get_audio_status()){chThdSleepMilliseconds(500);}
-	start_time=chVTGetSystemTime();
 
+	start_time=chVTGetSystemTime();
 
 	while(chVTGetSystemTime()<start_time + ROT_TIME)
 	{
 		check_angle=0;
 		turnangle = get_angle();
-		//chprintf((BaseSequentialStream *) &SD3, "ANGLE %f  \r\n", turnangle);
 		rotate_lr(ROT_COEF*turnangle);
 		chThdSleepMilliseconds(500);
 		set_speed(0);
-		if (fabs(turnangle)>40){reset_audio();  chThdSleepMilliseconds(1500);}
+		if (fabs(turnangle)>MAX_FILTER_CONVERGENCE){reset_audio();  chThdSleepMilliseconds(1500);}
 		chThdSleepMilliseconds(1000);
 
-		for(uint8_t i = 0 ; i < 5; i++)
+		for(uint8_t i = 0 ; i < STABILIZED_AUDIO; i++)
 		{
 			chThdSleepMilliseconds(100);
 			turnangle = get_angle();
 
-			if (fabs(turnangle) < 15.0f && get_audio_status()){check_angle++;}
+			if (fabs(turnangle) < MAX_ANGLE_ERROR && get_audio_status()){check_angle++;}
 
 			if (recognize_obstacle()){return last_type;}
-			if (check_angle>5){ return FALSE;}
+			if (check_angle>STABILIZED_AUDIO){ return FALSE;}
 		}
 
 	}
@@ -152,43 +148,43 @@ uint8_t rotate_to_source (void)
 
 void move_around_edge(void)
 {
-	rotate_lr((get_obstacle_type()*2-3)*300);
-	uint8_t stop = 0, type = get_obstacle_type();
+	rotate_lr((get_obstacle_type()*2-3)*SLOW_SPEED);
+	uint8_t type = get_obstacle_type();
 
 	set_led(LED3, 1);
 	set_led(LED7, 1);
 
 	while (type == get_obstacle_type())
 	{
-		chThdSleepMilliseconds(100);
+		chThdSleepMilliseconds(SENSOR_REFRESH_DELAY);
 	}
 	chThdSleepMilliseconds(500);
-	set_speed(0);
+	set_speed(HALT);
 	set_led(LED3, 0);
 	set_led(LED7, 0);
 }
 
 void move_through_gate(void)
 {
-	set_speed(0);
+	set_speed(HALT);
 	chThdSleepMilliseconds(1000);
-	set_speed(1000);
+	set_speed(CHARGING_SPEED);
 
 	while(VL53L0X_get_dist_mm()>COLLISION_DISTANCE)
 	{
-		chThdSleepMilliseconds(100);
+		chThdSleepMilliseconds(SENSOR_REFRESH_DELAY);
 	}
 
 	chThdSleepMilliseconds(700);
 
-	set_speed(0);
+	set_speed(HALT);
 }
 
 void move_to_goal(void)
 {
-	rotate_lr(300);
-	chThdSleepMilliseconds(5000);
-	set_speed(0);
+	rotate_lr(SLOW_SPEED);
+	chThdSleepMilliseconds(CELEBRATION_TIME);
+	set_speed(HALT);
 }
 
 

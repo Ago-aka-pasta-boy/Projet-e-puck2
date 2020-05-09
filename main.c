@@ -25,9 +25,6 @@ Adapted from the code given in the EPFL MICRO-315 TP (Spring Semester 2020)
 #include <sensors/VL53L0X/VL53L0X.h>
 #include <camera/po8030.h>
 
-#include <sensors/proximity.h>
-#include <msgbus/messagebus.h>
-
 #include <pathing.h>
 #include <process_image.h>
 #include <audio_processing.h>
@@ -113,22 +110,6 @@ int main(void)
     //FSM control variables
     bool move_forward = 0;
 
-    float ang_=0, ang_f=0;
-    int dis = 0;
-
-
-//    while(1)
-//    {
-//
-//    	chThdSleepMilliseconds(500);
-//    	dis = get_prox(2);
-//    	chprintf((BaseSequentialStream *) &SD3, "dis: %d    \r\n", dis);
-//    	rotate_to_source();
-//    	set_speed(700);
-//
-//    }
-//
-//while(1){chThdSleepMilliseconds(100);}
 
     //Main FSM loop
     while (1)
@@ -168,7 +149,6 @@ int main(void)
 			}
     	}
     }
-    chprintf((BaseSequentialStream *) &SD3, "LEAVING MAIN    \r\n");
 }
 
 //Stack Guard

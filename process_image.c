@@ -8,8 +8,21 @@
 
 #include <process_image.h>
 
-static struct line current_lines[MAXLINES];
-static struct obstacle current_obstacles[MAXLINES];
+struct line {
+	bool exist;
+	uint16_t start;
+	uint16_t end;
+	uint16_t pos;
+	uint16_t meanval;
+};
+
+struct obstacle{
+	uint8_t type;
+	uint16_t pos;
+};
+
+static struct line current_lines[MAX_LINES];
+static struct obstacle current_obstacles[MAX_LINES];
 
 
 //semaphore
@@ -22,18 +35,18 @@ static BSEMAPHORE_DECL(image_ready_sem, TRUE);
 
 void clear_all_lines(void)
 {
-	for(uint16_t i = 0 ; i < MAXLINES ; i++)
-		{
-			current_lines[i].exist=FALSE;
-			current_lines[i].start=0;
-			current_lines[i].end=0;
-			current_lines[i].pos=0;
-		}
+	for(uint8_t i = 0 ; i < MAX_LINES ; i++)
+	{
+		current_lines[i].exist=FALSE;
+		current_lines[i].start=0;
+		current_lines[i].end=0;
+		current_lines[i].pos=0;
+	}
 }
 
 void clear_all_obstacles(void)
 {
-	for(uint16_t i = 0 ; i < MAXLINES ; i++)
+	for(uint8_t i = 0 ; i < MAX_LINES ; i++)
 	{
 		current_obstacles[i].type=0;
 		current_obstacles[i].pos=0;
@@ -46,14 +59,11 @@ void clear_obstacle(uint8_t i)
 	current_obstacles[i].pos=0;
 }
 
-void extract_lines(uint8_t *buffer){
-
-
-
+void extract_lines(uint8_t *buffer)
+{
 	uint8_t stop = 0, falspos = 0, line_index = 0;
-	uint16_t i = 0,  k = 0, maxval=0;
+	uint16_t maxval=0;
 	uint32_t mean = 0, localmean = 0;
-
 
 	for(uint16_t i = 0 ; i < IMAGE_BUFFER_SIZE-MIN_LINE_WIDTH/2 ; i+=MIN_LINE_WIDTH/2)
 	{
@@ -67,17 +77,14 @@ void extract_lines(uint8_t *buffer){
 
 	}
 
-	//chprintf((BaseSequentialStream *) &SD3, "(MAXVAL) = %d \r\n", maxval);
-
-	if(maxval<70){return;}
-	mean = maxval*0.7;
+	if(maxval<STATIC_NOISE){return;}
+	mean = maxval*RATIO_TO_QUALIFY_LINES;
 
 	//clears the line array
 	clear_all_lines();
 
-
-	i = 0;
-	while (i < (IMAGE_BUFFER_SIZE - WIDTH_SLOPE) && line_index<MAXLINES)
+	uint16_t i = 0;
+	while (i < (IMAGE_BUFFER_SIZE - WIDTH_SLOPE) && line_index<MAX_LINES)
 	{
 		//search for a begin
 		while(stop == 0 && i < (IMAGE_BUFFER_SIZE - WIDTH_SLOPE))
@@ -87,7 +94,8 @@ void extract_lines(uint8_t *buffer){
 		    if(buffer[i] < mean && buffer[i+WIDTH_SLOPE] > mean)
 		    {
 		    	falspos = 0;
-		    	for(uint16_t k = i+WIDTH_SLOPE ; k < i + MIN_LINE_WIDTH ; k++){
+		    	for(uint16_t k = i+WIDTH_SLOPE ; k < i + MIN_LINE_WIDTH ; k++)
+		    	{
 		    		if (buffer[k]<mean){falspos=1; break;}
 		    	}
 		    	if (falspos==0){
@@ -117,8 +125,6 @@ void extract_lines(uint8_t *buffer){
 		    }
 		    stop =0;
 		}
-
-
 	}
 }
 
@@ -131,8 +137,7 @@ void extract_edges(uint8_t *buffer)
 
 	clear_all_obstacles();
 
-
-	for(uint16_t i = 0 ; i < MAXLINES ; i++)
+	for(uint8_t i = 0 ; i < MAX_LINES ; i++)
 	{
 		if(current_lines[i].exist)
 		{
@@ -146,13 +151,12 @@ void extract_edges(uint8_t *buffer)
 
 			if(left_mean < current_lines[i].meanval && right_mean < current_lines[i].meanval)
 			{
-
-				if(right_mean > 2*left_mean && right_mean > 0.3*current_lines[i].meanval)
+				if(right_mean > RATIO_TO_QUALIFY_EDGES*left_mean && right_mean > RATIO_TO_CONFIRM_EDGES*current_lines[i].meanval)
 				{
 					current_obstacles[edge_index].type = RIGHT_EDGE;
 					current_obstacles[edge_index].pos = current_lines[i].pos;
 				}
-				else if(left_mean > 2*right_mean && left_mean > 0.3*current_lines[i].meanval)
+				else if(left_mean > RATIO_TO_QUALIFY_EDGES*right_mean && left_mean > RATIO_TO_CONFIRM_EDGES*current_lines[i].meanval)
 				{
 					current_obstacles[edge_index].type = LEFT_EDGE;
 					current_obstacles[edge_index].pos = current_lines[i].pos;
@@ -164,16 +168,14 @@ void extract_edges(uint8_t *buffer)
 				}
 				edge_index++;
 			}
-			//chprintf((BaseSequentialStream *) &SD3, "LINE: %d       (LEFT_MEAN) = %d   (RIGHT_MEAN): %d  \r\n", i, left_mean, right_mean);
 		}
 	}
-
 }
 
 
 void extract_gate(void)
 {
-	for(uint16_t i = 0 ; i < MAXLINES-1 ; i++)
+	for(uint8_t i = 0 ; i < MAX_LINES-1 ; i++)
 	{
 		if(current_obstacles[i].type==RIGHT_EDGE && current_obstacles[i+1].type==LEFT_EDGE)
 		{
@@ -190,7 +192,7 @@ void extract_gate(void)
 //	uint16_t dist_closer_edge =IMAGE_BUFFER_SIZE/2,  dist_index_edge;
 //	if(current_obstacles[0].type!=GATE && current_obstacles[0].type!=GOAL)
 //	{
-//		for(uint8_t i = 0 ; i < MAXLINES ; i++)
+//		for(uint8_t i = 0 ; i < MAX_LINES ; i++)
 //		{
 //			if(current_obstacles[i].type==RIGHT_EDGE || current_obstacles[i].type==LEFT_EDGE)
 //			{
@@ -214,7 +216,7 @@ void extract_gate(void)
 void extract_goal(void)
 {
 	uint8_t line_count = 0;
-	for(uint8_t i = 0 ; i < MAXLINES-1; i++)
+	for(uint8_t i = 0 ; i < MAX_LINES-1; i++)
 	{
 		if(current_lines[i].exist){line_count++;}
 	}
@@ -227,8 +229,8 @@ void extract_goal(void)
 
 
 static THD_WORKING_AREA(waCaptureImage, 256);
-static THD_FUNCTION(CaptureImage, arg) {
-
+static THD_FUNCTION(CaptureImage, arg)
+{
     chRegSetThreadName(__FUNCTION__);
     (void)arg;
 
@@ -238,7 +240,8 @@ static THD_FUNCTION(CaptureImage, arg) {
 	dcmi_set_capture_mode(CAPTURE_ONE_SHOT);
 	dcmi_prepare();
 
-    while(1){
+    while(1)
+    {
         //starts a capture
 		dcmi_capture_start();
 		//waits for the capture to be done
@@ -250,21 +253,17 @@ static THD_FUNCTION(CaptureImage, arg) {
 
 
 static THD_WORKING_AREA(waProcessImage, 1024);
-static THD_FUNCTION(ProcessImage, arg) {
-
+static THD_FUNCTION(ProcessImage, arg)
+{
     chRegSetThreadName(__FUNCTION__);
     (void)arg;
 
 	uint8_t *img_buff_ptr;
 	uint8_t image_red[IMAGE_BUFFER_SIZE] = {0};
-	//uint8_t image_green[IMAGE_BUFFER_SIZE] = {0};
-	//uint8_t image_blue[IMAGE_BUFFER_SIZE] = {0};
-
 	bool send_to_computer = TRUE;
 
 //	clear_all_lines();
 //	clear_all_obstacles();
-
 
     while(1){
     	//waits until an image has been captured
@@ -273,12 +272,11 @@ static THD_FUNCTION(ProcessImage, arg) {
 		img_buff_ptr = dcmi_get_last_image_ptr();
 
 		//Extracts only the red pixels
-		for(uint16_t i = 0 ; i < (2 * IMAGE_BUFFER_SIZE) ; i+=2){
+		for(uint16_t i = 0 ; i < (2 * IMAGE_BUFFER_SIZE) ; i+=2)
+		{
 			//extracts first 5bits of the first byte
 			//takes nothing from the second byte
 			image_red[i/2] = (uint8_t)img_buff_ptr[i]&0xF8;
-			//image_green[i/2] = ((((uint8_t)img_buff_ptr[i]&0x07)<<5)|(((uint8_t)img_buff_ptr[i+1]&0xE0>>3)))/2;
-			//image_blue[i/2] = ((uint8_t)img_buff_ptr[i+1]&0x1F)<<3;
 		}
 
 
@@ -290,7 +288,7 @@ static THD_FUNCTION(ProcessImage, arg) {
 		extract_goal();
 
 		//TESTING
-		for(uint16_t i = 0 ; i < MAXLINES; i++)
+		for(uint8_t i = 0 ; i < MAX_LINES; i++)
 		{
 			if (current_obstacles[i].type != 0 && current_obstacles[i].type != UNKNOWN)
 			{
@@ -298,15 +296,10 @@ static THD_FUNCTION(ProcessImage, arg) {
 			}
 		}
 
-		//chprintf((BaseSequentialStream *) &SD3, "image thread    \r\n");
-
-
-
 		if (send_to_computer)
 		{
 			SendUint8ToComputer(image_red, IMAGE_BUFFER_SIZE);
 		}
-
 		send_to_computer = !send_to_computer;
     }
 }

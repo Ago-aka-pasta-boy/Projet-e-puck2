@@ -24,7 +24,6 @@ Adapted from the code given in the EPFL MICRO-315 TP (Spring Semester 2020)
 #include <arm_math.h>
 
 //Defines
-//#define FILTER_SIZE		20 //Size of the moving average filter's buffer
 #define A				0.925f
 #define B				0.075f
 
@@ -34,6 +33,9 @@ Adapted from the code given in the EPFL MICRO-315 TP (Spring Semester 2020)
 #define FREQ_SENDER		64 //32=488HZ 64=876 ?!? 976 bro :P
 #define MAX_FREQ		69	//we don't analyze after this index to not use resources for nothing
 #define MAX_ERROR		1	//frequency tolerance
+
+#define BASE_LR_VALUE	0		//value of the dephasage between left and right microphones when the source is in front
+#define BASE_FB_VALUE	-0.5f	//value of the dephasage between front and back microphones when the source is in front
 
 
 //semaphore
@@ -53,9 +55,6 @@ static float micBack_output[FFT_SIZE];
 //Arrays containing the phase differences from the audio data
 static float phase_diff_lr;//[FILTER_SIZE] ={ 0};
 static float phase_diff_fb;//[FILTER_SIZE] ={ 0};
-//Current phase differences
-//static float current_phase_diff_lr=0;
-//static float current_phase_diff_fb=0;
 //Angle to the sound source
 static float angle = 0;
 //Moving averages for the phase differences
@@ -171,12 +170,6 @@ void processAudioData(int16_t *data, uint16_t num_samples)
 		uint16_t freq_back = max_frequency(micBack_output);
 
 
-		//CHECK ALL ARE SAME
-
-		//Introduce the microphone data directly into the motor functions (with cooefs)
-
-		//0.9*old + 0.1*new = new_filtered
-
 		//detection of the wanted frequency and check if all microphones have the same max frequency
 		if((abs(freq_left - FREQ_SENDER)<= MAX_ERROR) && (freq_right == freq_left)&&
 				(freq_front == freq_left)&&	(freq_back == freq_left))
@@ -189,54 +182,22 @@ void processAudioData(int16_t *data, uint16_t num_samples)
 			phase_diff_fb = atan2f(micFront_cmplx_input[freq_front+1],micFront_cmplx_input[freq_front])
 												-atan2f(micBack_cmplx_input[freq_back+1],micBack_cmplx_input[freq_back]);
 
-			//moving average that only considers left and right microphone phase differences smaller than 1 to reject some noise
+			//average that only considers left and right microphone phase differences smaller than 1 to reject some noise
 			if(fabs(phase_diff_lr)<1)
 			{
-//				//all the old values in the buffer are pulled to the left
-//				for (uint8_t i = 0; i < FILTER_SIZE-1; i++)
-//				{
-//					phase_diff_lr[i]=phase_diff_lr[i+1];
-//				}
-//
-//				//the new value is put in the last index of the buffer
-//				phase_diff_lr[FILTER_SIZE-1] = current_phase_diff_lr;
-//
-//				//here an average with linear weights, so the last new value is the most important
-//				for (uint8_t i = 0; i < FILTER_SIZE; i++)
-//				{
-//					mov_avg_lr+=phase_diff_lr[i];//*i;
-//				}
-//				mov_avg_lr /= FILTER_SIZE;//*(FILTER_SIZE+1)/2;
 				mov_avg_lr = A * mov_avg_lr + B * phase_diff_lr;
-
-
 			}
 
-			//here the same moving average principle is applied to phase differences between front and back
+			//here the same principle is applied to phase differences between front and back
 			if(fabs(phase_diff_fb)<1)
 			{
-//				for (uint8_t i = 0; i < FILTER_SIZE-1; i++)
-//				{
-//					phase_diff_fb[i]=phase_diff_fb[i+1];
-//				}
-//
-//				//phase differences between microphones
-//				phase_diff_fb[FILTER_SIZE-1] = current_phase_diff_fb;
-//
-//				for (uint8_t i = 0; i < FILTER_SIZE; i++)
-//				{
-//					mov_avg_fb+=phase_diff_fb[i];//*i;
-//				}
-//				mov_avg_fb /= FILTER_SIZE;//*(FILTER_SIZE+1)/2;
 				mov_avg_fb = A * mov_avg_fb + B * phase_diff_fb;
 			}
-
 		}
 
 		else
 		{
 			audio_status = NO_AUDIO;
-
 		}
 	}
 }
@@ -245,8 +206,8 @@ void processAudioData(int16_t *data, uint16_t num_samples)
 //Resets the moving average
 void reset_audio (void)
 {
-	mov_avg_lr = 0;
-	mov_avg_fb = -0.5;
+	mov_avg_lr = BASE_LR_VALUE;
+	mov_avg_fb = BASE_FB_VALUE;
 }
 
 
@@ -264,7 +225,6 @@ float get_angle(void)
 	if (audio_status == NO_AUDIO){return 0;}
 	//Angle calculation from the averaged and filtered phase differences. Mov_avg_fb is inverted to correct for the orientation.
 	angle=atan2f(mov_avg_lr,-(mov_avg_fb))*360.0f/(2.0f*PI);
-
 	return angle;
 }
 
