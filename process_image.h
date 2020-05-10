@@ -8,12 +8,14 @@
 //-------------
 
 #define MAX_LINES				5
-#define STATIC_NOISE			70
+#define STATIC_NOISE			100
 #define	RATIO_TO_QUALIFY_LINES	0.7
 #define RATIO_TO_QUALIFY_EDGES	2
 #define RATIO_TO_CONFIRM_EDGES	0.3
+#define MIN_LINES_FOR_GOAL		2
 
 //Obstacle types
+
 #define LEFT_EDGE				1
 #define RIGHT_EDGE				2
 #define GATE					3

@@ -161,11 +161,6 @@ void extract_edges(uint8_t *buffer)
 					current_obstacles[edge_index].type = LEFT_EDGE;
 					current_obstacles[edge_index].pos = current_lines[i].pos;
 				}
-				else
-				{
-					current_obstacles[edge_index].type = UNKNOWN;
-					current_obstacles[edge_index].pos = current_lines[i].pos;
-				}
 				edge_index++;
 			}
 		}
@@ -220,7 +215,7 @@ void extract_goal(void)
 	{
 		if(current_lines[i].exist){line_count++;}
 	}
-	if (line_count > 2)
+	if (line_count > MIN_LINES_FOR_GOAL)
 	{
 	current_obstacles[0].type = GOAL;
 	current_obstacles[0].pos = current_obstacles[1].pos;
@@ -262,8 +257,8 @@ static THD_FUNCTION(ProcessImage, arg)
 	uint8_t image_red[IMAGE_BUFFER_SIZE] = {0};
 	bool send_to_computer = TRUE;
 
-//	clear_all_lines();
-//	clear_all_obstacles();
+	clear_all_lines();
+	clear_all_obstacles();
 
     while(1){
     	//waits until an image has been captured
@@ -298,7 +293,7 @@ static THD_FUNCTION(ProcessImage, arg)
 
 		if (send_to_computer)
 		{
-			SendUint8ToComputer(image_red, IMAGE_BUFFER_SIZE);
+			//SendUint8ToComputer(image_red, IMAGE_BUFFER_SIZE);
 		}
 		send_to_computer = !send_to_computer;
     }
@@ -315,6 +310,6 @@ uint16_t get_obstacle_pos(void){
 
 
 void process_image_start(void){
-	chThdCreateStatic(waProcessImage, sizeof(waProcessImage), NORMALPRIO, ProcessImage, NULL);
-	chThdCreateStatic(waCaptureImage, sizeof(waCaptureImage), NORMALPRIO, CaptureImage, NULL);
+	chThdCreateStatic(waProcessImage, sizeof(waProcessImage), NORMALPRIO+1, ProcessImage, NULL);
+	chThdCreateStatic(waCaptureImage, sizeof(waCaptureImage), NORMALPRIO+1, CaptureImage, NULL);
 }

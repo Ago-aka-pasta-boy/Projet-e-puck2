@@ -24,6 +24,7 @@ Adapted from the code given in the EPFL MICRO-315 TP (Spring Semester 2020)
 #include <audio/microphone.h>
 #include <sensors/VL53L0X/VL53L0X.h>
 #include <camera/po8030.h>
+#include "msgbus/messagebus.h"
 
 #include <pathing.h>
 #include <process_image.h>
@@ -32,6 +33,8 @@ Adapted from the code given in the EPFL MICRO-315 TP (Spring Semester 2020)
 #include <communications.h>
 #include <arm_math.h>
 
+//FSM control variables
+static bool move_forward = 0;
 static uint8_t obstacle_type = 0;
 
 //Sends data to the computer for visualization and testing
@@ -57,24 +60,7 @@ static void serial_start(void)
 }
 
 
-//General Purpose Timer configuration
-static void timer12_start(void)
-{
-    static const GPTConfig gpt12cfg = {
-        1000000,        /* 1MHz timer clock in order to measure uS.*/
-        NULL,           /* Timer callback.*/
-        0,
-        0
-    };
 
-    gptStart(&GPTD12, &gpt12cfg);
-    //let the timer count to max value
-    gptStartContinuous(&GPTD12, 0xFFFF);
-}
-
-
-//Short sign(x) function
-int sign(float x){return (x > 0) - (x < 0);}
 
 
 
@@ -89,8 +75,6 @@ int main(void)
     serial_start();
     //starts the USB communication
     usb_start();
-    //starts timer 12
-    timer12_start();
     //inits the motors
     motors_init();
     //inits the TOF sensor
@@ -105,11 +89,10 @@ int main(void)
     //starts the microphones processing thread, calls the callback given in parameter when samples are ready
     mic_start(&processAudioData);
 
+    chThdSetPriority(NORMALPRIO +2);
+
+
     //-------------------------------------------FSM--------------------------------------------------------------
-
-    //FSM control variables
-    bool move_forward = 0;
-
 
     //Main FSM loop
     while (1)
@@ -117,10 +100,14 @@ int main(void)
     	obstacle_type=0;
     	if (!move_forward)
     	{
-    	obstacle_type=rotate_to_source();
+    		obstacle_type=rotate_to_source();
+    	}
+    	if (!obstacle_type)
+    	{
+    		obstacle_type=path_to_obstacle();
     	}
     	move_forward = FALSE;
-    	obstacle_type=path_to_obstacle();
+
     	if(obstacle_type)
     	{
 			switch (obstacle_type)
@@ -128,23 +115,27 @@ int main(void)
 				case LEFT_EDGE:
 					move_around_edge();
 					move_forward = TRUE;
-					chThdSleepMilliseconds(1000);
+					//chThdSleepMilliseconds(1000);
 					break;
 
 				case RIGHT_EDGE:
 					move_around_edge();
 					move_forward = TRUE;
-					chThdSleepMilliseconds(1000);
+					//chThdSleepMilliseconds(1000);
 					break;
 
 				case GATE:
 					move_through_gate();
-					chThdSleepMilliseconds(1000);
+					//chThdSleepMilliseconds(1000);
 					break;
 
 				case GOAL:
 					move_to_goal();
-					chThdSleepMilliseconds(1000);
+					//chThdSleepMilliseconds(1000);
+					break;
+
+				case UNKNOWN:
+					move_back();
 					break;
 			}
     	}

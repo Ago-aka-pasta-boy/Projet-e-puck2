@@ -29,6 +29,9 @@ void set_speed(int speed)
 }
 
 
+//Short sign(x) function
+int sign(float x){return (x > 0) - (x < 0);}
+
 void rotate_lr(int lr)
 {
 	if(abs(lr)<MINIMUM_ROT_SPEED){lr =sign(lr)*MINIMUM_ROT_SPEED;}
@@ -40,7 +43,7 @@ void rotate_lr(int lr)
 void move_back (void)
 {
 	set_led(LED1, 1);
-	set_speed(-SLOW_SPEED);		// it was at 400, not SLOW_SPEED that is 300
+	set_speed(-SLOW_SPEED);
 	while(VL53L0X_get_dist_mm()<TOO_CLOSE)
 	{
 		chThdSleepMilliseconds(SENSOR_REFRESH_DELAY);
@@ -79,6 +82,9 @@ uint8_t path_to_obstacle (void)
 
 	while(chVTGetSystemTime()<start_time + TRAVEL_TIME)
 	{
+		//Releases resources to the sensor handling threads to update
+		chThdSleepMilliseconds(SENSOR_REFRESH_DELAY);
+
 		if (recognize_obstacle())
 		{
 			set_speed(HALT);
@@ -88,9 +94,9 @@ uint8_t path_to_obstacle (void)
 
 		if(VL53L0X_get_dist_mm()<SAFETY_DISTANCE)
 		{
+			set_speed(HALT);
 			set_body_led(0);
-			move_back();
-			return FALSE;
+			return UNKNOWN;
 		}
 
 		if(VL53L0X_get_dist_mm()<SLOW_DOWN_DISTANCE)
@@ -126,17 +132,23 @@ uint8_t rotate_to_source (void)
 		turnangle = get_angle();
 		rotate_lr(ROT_COEF*turnangle);
 		chThdSleepMilliseconds(500);
-		set_speed(0);
-		if (fabs(turnangle)>MAX_FILTER_CONVERGENCE){reset_audio();  chThdSleepMilliseconds(1500);}
+		set_speed(HALT);
+		if (fabs(turnangle)>LARGE_ANGLE){reset_audio();  chThdSleepMilliseconds(1500);}
 		chThdSleepMilliseconds(1000);
 
 		for(uint8_t i = 0 ; i < STABILIZED_AUDIO; i++)
 		{
-			chThdSleepMilliseconds(100);
+			chThdSleepMilliseconds(SENSOR_REFRESH_DELAY);
 			turnangle = get_angle();
 
 			if (fabs(turnangle) < MAX_ANGLE_ERROR && get_audio_status()){check_angle++;}
 
+			if(VL53L0X_get_dist_mm()<SAFETY_DISTANCE)
+			{
+				set_speed(HALT);
+				set_body_led(0);
+				return UNKNOWN;
+			}
 			if (recognize_obstacle()){return last_type;}
 			if (check_angle>STABILIZED_AUDIO){ return FALSE;}
 		}
@@ -158,7 +170,7 @@ void move_around_edge(void)
 	{
 		chThdSleepMilliseconds(SENSOR_REFRESH_DELAY);
 	}
-	chThdSleepMilliseconds(500);
+	chThdSleepMilliseconds(OBSTACLE_CLEARING_DELAY);
 	set_speed(HALT);
 	set_led(LED3, 0);
 	set_led(LED7, 0);
@@ -168,14 +180,14 @@ void move_through_gate(void)
 {
 	set_speed(HALT);
 	chThdSleepMilliseconds(1000);
-	set_speed(CHARGING_SPEED);
+	set_speed(RAM_SPEED);
 
 	while(VL53L0X_get_dist_mm()>COLLISION_DISTANCE)
 	{
 		chThdSleepMilliseconds(SENSOR_REFRESH_DELAY);
 	}
 
-	chThdSleepMilliseconds(700);
+	chThdSleepMilliseconds(OBSTACLE_CLEARING_DELAY);
 
 	set_speed(HALT);
 }
@@ -183,8 +195,20 @@ void move_through_gate(void)
 void move_to_goal(void)
 {
 	rotate_lr(SLOW_SPEED);
-	chThdSleepMilliseconds(CELEBRATION_TIME);
-	set_speed(HALT);
+	while(1)
+	{
+		set_led(LED1, 1);
+		set_led(LED3, 1);
+		set_led(LED5, 1);
+		set_led(LED7, 1);
+		chThdSleepMilliseconds(CELEBRATION_TIME);
+		set_led(LED1, 0);
+		set_led(LED3, 0);
+		set_led(LED5, 0);
+		set_led(LED7, 0);
+		chThdSleepMilliseconds(CELEBRATION_TIME);
+
+	}
 }
 
 

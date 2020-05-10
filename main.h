@@ -26,8 +26,6 @@ extern "C" {
 void SendUint8ToComputer(uint8_t* data, uint16_t size);
 
 
-//Short sign(x) function
-int sign(float x);
 
 
 /** Robot wide IPC bus. */
