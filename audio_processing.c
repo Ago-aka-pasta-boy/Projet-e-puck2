@@ -13,13 +13,9 @@ Adapted from the code given in the EPFL MICRO-315 TP (Spring Semester 2020)
 #include "hal.h"
 #include <main.h>
 #include <usbcfg.h>
-#include <chprintf.h>
 
-#include "leds.h"
-#include <motors.h>
 #include <audio/microphone.h>
 #include <audio_processing.h>
-#include <communications.h>
 #include <fft.h>
 #include <arm_math.h>
 
@@ -226,29 +222,6 @@ float get_angle(void)
 	//Angle calculation from the averaged and filtered phase differences. Mov_avg_fb is inverted to correct for the orientation.
 	angle=atan2f(mov_avg_lr,-(mov_avg_fb))*360.0f/(2.0f*PI);
 	return angle;
-}
-
-
-//Returns the LR moving average - mostly for testing
-float get_lr(void)
-{
-	if (audio_status == NO_AUDIO){return 0;}
-	return mov_avg_lr;
-}
-
-
-//Returns the FB moving average - mostly for testing
-float get_fb(void)
-{
-	if (audio_status == NO_AUDIO){return 0;}
-	return mov_avg_fb;
-}
-
-
-//Signals to send the result to the computer
-void wait_send_to_computer(void)
-{
-	chBSemWait(&sendToComputer_sem);
 }
 
 

@@ -21,13 +21,6 @@ extern "C" {
 #include "parameter/parameter.h"
 
 
-
-//Sends data to the computer for visualization and testing
-void SendUint8ToComputer(uint8_t* data, uint16_t size);
-
-
-
-
 /** Robot wide IPC bus. */
 extern messagebus_t bus;
 

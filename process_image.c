@@ -1,6 +1,5 @@
 #include "ch.h"
 #include "hal.h"
-#include <chprintf.h>
 #include <usbcfg.h>
 
 #include <main.h>
@@ -181,32 +180,6 @@ void extract_gate(void)
 	}
 }
 
-//void choose_edge(void)
-//{
-//	uint8_t closer_edge = 0;
-//	uint16_t dist_closer_edge =IMAGE_BUFFER_SIZE/2,  dist_index_edge;
-//	if(current_obstacles[0].type!=GATE && current_obstacles[0].type!=GOAL)
-//	{
-//		for(uint8_t i = 0 ; i < MAX_LINES ; i++)
-//		{
-//			if(current_obstacles[i].type==RIGHT_EDGE || current_obstacles[i].type==LEFT_EDGE)
-//			{
-//				dist_index_edge = abs(current_obstacles[i].pos-IMAGE_BUFFER_SIZE/2);
-//				if(dist_index_edge<dist_closer_edge)
-//				{
-//					dist_closer_edge = dist_index_edge;
-//					closer_edge = i;
-//				}
-//			}
-//		}
-//		if(closer_edge)
-//		{
-//			current_obstacles[0].type=current_obstacles[closer_edge].type;
-//			current_obstacles[0].pos=current_obstacles[closer_edge].pos;
-//		}
-//	}
-//}
-
 
 void extract_goal(void)
 {
@@ -255,7 +228,6 @@ static THD_FUNCTION(ProcessImage, arg)
 
 	uint8_t *img_buff_ptr;
 	uint8_t image_red[IMAGE_BUFFER_SIZE] = {0};
-	bool send_to_computer = TRUE;
 
 	clear_all_lines();
 	clear_all_obstacles();
@@ -275,27 +247,11 @@ static THD_FUNCTION(ProcessImage, arg)
 		}
 
 
-		//search for a line in the image and gets its width in pixels
 		extract_lines(image_red);
 		extract_edges(image_red);
 		extract_gate();
-		//choose_edge();
 		extract_goal();
 
-		//TESTING
-		for(uint8_t i = 0 ; i < MAX_LINES; i++)
-		{
-			if (current_obstacles[i].type != 0 && current_obstacles[i].type != UNKNOWN)
-			{
-				//chprintf((BaseSequentialStream *) &SD3, "(OBSTACLE_INDEX) = %d   TYPE: %d    POS:%d   \r\n", i, current_obstacles[i].type, current_obstacles[i].pos);
-			}
-		}
-
-		if (send_to_computer)
-		{
-			//SendUint8ToComputer(image_red, IMAGE_BUFFER_SIZE);
-		}
-		send_to_computer = !send_to_computer;
     }
 }
 

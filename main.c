@@ -13,56 +13,23 @@ Adapted from the code given in the EPFL MICRO-315 TP (Spring Semester 2020)
 #include <stdlib.h>
 #include <string.h>
 
-#include "leds.h"
 #include "ch.h"
 #include "hal.h"
 #include "memory_protection.h"
 #include <usbcfg.h>
 #include <main.h>
-#include <chprintf.h>
-#include <motors.h>
 #include <audio/microphone.h>
 #include <sensors/VL53L0X/VL53L0X.h>
 #include <camera/po8030.h>
-#include "msgbus/messagebus.h"
+#include <motors.h>
 
 #include <pathing.h>
 #include <process_image.h>
 #include <audio_processing.h>
-#include <fft.h>
-#include <communications.h>
-#include <arm_math.h>
 
 //FSM control variables
 static bool move_forward = 0;
 static uint8_t obstacle_type = 0;
-
-//Sends data to the computer for visualization and testing
-void SendUint8ToComputer(uint8_t* data, uint16_t size)
-{
-	chSequentialStreamWrite((BaseSequentialStream *)&SD3, (uint8_t*)"START", 5);
-	chSequentialStreamWrite((BaseSequentialStream *)&SD3, (uint8_t*)&size, sizeof(uint16_t));
-	chSequentialStreamWrite((BaseSequentialStream *)&SD3, (uint8_t*)data, size);
-}
-
-
-//Starts the serial communication
-static void serial_start(void)
-{
-	static SerialConfig ser_cfg = {
-	    115200,
-	    0,
-	    0,
-	    0,
-	};
-
-	sdStart(&SD3, &ser_cfg); // UART3.
-}
-
-
-
-
-
 
 int main(void)
 {
@@ -71,8 +38,6 @@ int main(void)
     chSysInit();
     mpu_init();
 
-    //starts the serial communication
-    serial_start();
     //starts the USB communication
     usb_start();
     //inits the motors
@@ -89,6 +54,7 @@ int main(void)
     //starts the microphones processing thread, calls the callback given in parameter when samples are ready
     mic_start(&processAudioData);
 
+    //Sets the main thread's priority above the processing threads
     chThdSetPriority(NORMALPRIO +2);
 
 
@@ -115,23 +81,19 @@ int main(void)
 				case LEFT_EDGE:
 					move_around_edge();
 					move_forward = TRUE;
-					//chThdSleepMilliseconds(1000);
 					break;
 
 				case RIGHT_EDGE:
 					move_around_edge();
 					move_forward = TRUE;
-					//chThdSleepMilliseconds(1000);
 					break;
 
 				case GATE:
 					move_through_gate();
-					//chThdSleepMilliseconds(1000);
 					break;
 
 				case GOAL:
 					move_to_goal();
-					//chThdSleepMilliseconds(1000);
 					break;
 
 				case UNKNOWN:

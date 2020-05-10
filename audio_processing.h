@@ -36,11 +36,6 @@ typedef enum {
 //NEW
 void reset_audio (void);
 
-//TEST
-float get_fb(void);
-float get_lr(void);
-
-
 //Main audio processing function
 void processAudioData(int16_t *data, uint16_t num_samples);
 
