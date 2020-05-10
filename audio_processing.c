@@ -20,22 +20,19 @@ Adapted from the code given in the EPFL MICRO-315 TP (Spring Semester 2020)
 #include <arm_math.h>
 
 //Defines
-#define A				0.925f
-#define B				0.075f
+#define FFT_SIZE 			1024			//Size of the buffer where the result of the FFT is stored
 
-#define MIN_VALUE_THRESHOLD	10000 //Threshold value for the max_frequency function
+#define MIN_VALUE_THRESHOLD	10000 			//Threshold value for the max_frequency function
+#define MIN_FREQ			59				//We don't analyze before this index to not use resources for nothing
+#define FREQ_SOURCE			64				//64 * 15.3 = 980hz, in reality best results were observed at 990hz
+#define MAX_FREQ			69				//We don't analyze after this index to not use resources for nothing
+#define MAX_ERROR			1				//Frequency tolerance
 
-#define MIN_FREQ		59	//we don't analyze before this index to not use resources for nothing
-#define FREQ_SENDER		64 //32=488HZ 64=876 ?!? 976 bro :P
-#define MAX_FREQ		69	//we don't analyze after this index to not use resources for nothing
-#define MAX_ERROR		1	//frequency tolerance
+#define A					0.925f			//Coefficient for the low-pass filter to apply to the past values
+#define B					0.075f			//= 1-A, coefficient for the new value
+#define BASE_LR_VALUE		0				//Value of the dephasage between left and right microphones when the source is in front
+#define BASE_FB_VALUE		-0.5f			//Value of the dephasage between front and back microphones when the source is in front
 
-#define BASE_LR_VALUE	0		//value of the dephasage between left and right microphones when the source is in front
-#define BASE_FB_VALUE	-0.5f	//value of the dephasage between front and back microphones when the source is in front
-
-
-//semaphore
-static BSEMAPHORE_DECL(sendToComputer_sem, TRUE);
 
 
 //2 times FFT_SIZE because these arrays contain complex numbers (real + imaginary)
@@ -48,11 +45,7 @@ static float micLeft_output[FFT_SIZE];
 static float micRight_output[FFT_SIZE];
 static float micFront_output[FFT_SIZE];
 static float micBack_output[FFT_SIZE];
-//Arrays containing the phase differences from the audio data
-static float phase_diff_lr;//[FILTER_SIZE] ={ 0};
-static float phase_diff_fb;//[FILTER_SIZE] ={ 0};
-//Angle to the sound source
-static float angle = 0;
+
 //Moving averages for the phase differences
 static float mov_avg_lr = 0;
 static float mov_avg_fb = 0;
@@ -88,18 +81,11 @@ uint16_t max_frequency(float* data)
 */
 void processAudioData(int16_t *data, uint16_t num_samples)
 {
-	/*
-	*
-	*	We get 160 samples per mic every 10ms
-	*	So we fill the samples buffers to reach
-	*	1024 samples, then we compute the FFTs.
-	*
-	*/
-
-	static uint16_t nb_samples = 0;
-	static uint8_t mustSend = 0;
-
-	//loop to fill the buffers
+	//Number of samples in the buffer that we have to fill to FFT_SIZE
+	uint16_t nb_samples = 0;
+	//Phase differences computed from the audio data between respectively left-right and front-back microphones
+	float phase_diff_lr, phase_diff_fb;
+	//Loop to fill the buffers
 	for(uint16_t i = 0 ; i < num_samples ; i+=4)
 	{
 		//construct an array of complex numbers. Put 0 to the imaginary part
@@ -148,16 +134,7 @@ void processAudioData(int16_t *data, uint16_t num_samples)
 		arm_cmplx_mag_f32(micLeft_cmplx_input, micLeft_output, FFT_SIZE);
 		arm_cmplx_mag_f32(micFront_cmplx_input, micFront_output, FFT_SIZE);
 		arm_cmplx_mag_f32(micBack_cmplx_input, micBack_output, FFT_SIZE);
-
-		//sends only one FFT result over 10 for 1 mic to not flood the computer
-		//sends to UART3
-		if(mustSend > 8){
-			//Signals to send the result to the computer
-			chBSemSignal(&sendToComputer_sem);
-			mustSend = 0;
-		}
 		nb_samples = 0;
-		mustSend++;
 
 		//Finds the frequency of each microphone
 		uint16_t freq_left = max_frequency(micLeft_output);
@@ -166,19 +143,19 @@ void processAudioData(int16_t *data, uint16_t num_samples)
 		uint16_t freq_back = max_frequency(micBack_output);
 
 
-		//detection of the wanted frequency and check if all microphones have the same max frequency
-		if((abs(freq_left - FREQ_SENDER)<= MAX_ERROR) && (freq_right == freq_left)&&
+		//Detection of the wanted frequency and check if all microphones have the same max frequency
+		if((abs(freq_left - FREQ_SOURCE)<= MAX_ERROR) && (freq_right == freq_left)&&
 				(freq_front == freq_left)&&	(freq_back == freq_left))
 		{
-			//changing the audio status to the case detected
-			audio_status = FREQ_1;
-			//computing the phases from the data of two mics and their difference
+			//Changing the audio status to the case detected
+			audio_status = AUDIO_DETECTED;
+			//Computing the phases from the data of two opposite mics and subtracting to obtain the dephasage
 			phase_diff_lr = atan2f(micLeft_cmplx_input[freq_left+1],micLeft_cmplx_input[freq_left])
 												-atan2f(micRight_cmplx_input[freq_right+1],micRight_cmplx_input[freq_right]);
 			phase_diff_fb = atan2f(micFront_cmplx_input[freq_front+1],micFront_cmplx_input[freq_front])
 												-atan2f(micBack_cmplx_input[freq_back+1],micBack_cmplx_input[freq_back]);
 
-			//average that only considers left and right microphone phase differences smaller than 1 to reject some noise
+			//Average emulating a low-pass filter, considers only left and right microphone phase differences smaller than 1 to reject some noise
 			if(fabs(phase_diff_lr)<1)
 			{
 				mov_avg_lr = A * mov_avg_lr + B * phase_diff_lr;
@@ -190,7 +167,7 @@ void processAudioData(int16_t *data, uint16_t num_samples)
 				mov_avg_fb = A * mov_avg_fb + B * phase_diff_fb;
 			}
 		}
-
+		//if the max frequency of all four microphones was not the one wanted
 		else
 		{
 			audio_status = NO_AUDIO;
@@ -199,7 +176,7 @@ void processAudioData(int16_t *data, uint16_t num_samples)
 }
 
 
-//Resets the moving average
+//Resets the moving average so the filter does not take a lot of time to converge after a large angle
 void reset_audio (void)
 {
 	mov_avg_lr = BASE_LR_VALUE;
@@ -217,42 +194,11 @@ uint8_t get_audio_status(void)
 //Returns the current angle
 float get_angle(void)
 {
+	float angle =0;
 	//Checks if the frequency is registered
 	if (audio_status == NO_AUDIO){return 0;}
-	//Angle calculation from the averaged and filtered phase differences. Mov_avg_fb is inverted to correct for the orientation.
+	//The angle to sound source is computed from the filtered phase differences. Mov_avg_fb is inverted to correct for the orientation.
 	angle=atan2f(mov_avg_lr,-(mov_avg_fb))*360.0f/(2.0f*PI);
 	return angle;
 }
 
-
-//Returns the pointers for the audio buffers
-float* get_audio_buffer_ptr(BUFFER_NAME_t name)
-{
-	if(name == LEFT_CMPLX_INPUT){
-		return micLeft_cmplx_input;
-	}
-	else if (name == RIGHT_CMPLX_INPUT){
-		return micRight_cmplx_input;
-	}
-	else if (name == FRONT_CMPLX_INPUT){
-		return micFront_cmplx_input;
-	}
-	else if (name == BACK_CMPLX_INPUT){
-		return micBack_cmplx_input;
-	}
-	else if (name == LEFT_OUTPUT){
-		return micLeft_output;
-	}
-	else if (name == RIGHT_OUTPUT){
-		return micRight_output;
-	}
-	else if (name == FRONT_OUTPUT){
-		return micFront_output;
-	}
-	else if (name == BACK_OUTPUT){
-		return micBack_output;
-	}
-	else{
-		return NULL;
-	}
-}

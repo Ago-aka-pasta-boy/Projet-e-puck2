@@ -12,31 +12,16 @@ Adapted from the code given in the EPFL MICRO-315 TP (Spring Semester 2020)
 #ifndef AUDIO_PROCESSING_H
 #define AUDIO_PROCESSING_H
 
-//Size of the buffers
-#define FFT_SIZE 	1024
 
 //Possible Audio states
-#define NO_AUDIO	0
-#define FREQ_1		1
-
-typedef enum {
-	//2 times FFT_SIZE because these arrays contain complex numbers (real + imaginary)
-	LEFT_CMPLX_INPUT = 0,
-	RIGHT_CMPLX_INPUT,
-	FRONT_CMPLX_INPUT,
-	BACK_CMPLX_INPUT,
-	//Arrays containing the computed magnitude of the complex numbers
-	LEFT_OUTPUT,
-	RIGHT_OUTPUT,
-	FRONT_OUTPUT,
-	BACK_OUTPUT
-} BUFFER_NAME_t;
+#define NO_AUDIO			0
+#define AUDIO_DETECTED		1
 
 
-//NEW
+//Resets the moving average so the filter does not take a lot of time to converge after a large angle
 void reset_audio (void);
 
-//Main audio processing function
+//Callback for the audio processing
 void processAudioData(int16_t *data, uint16_t num_samples);
 
 //Returns the current audio status
