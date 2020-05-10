@@ -126,17 +126,18 @@ uint8_t rotate_to_source (void)
 
 	start_time=chVTGetSystemTime();
 
-	while(chVTGetSystemTime()<start_time + ROT_TIME)
+	while(1)
 	{
 		check_angle=0;
 		turnangle = get_angle();
 		rotate_lr(ROT_COEF*turnangle);
 		chThdSleepMilliseconds(500);
 		set_speed(HALT);
+		if (chVTGetSystemTime()>start_time + ROT_TIME){break;}
 		if (fabs(turnangle)>LARGE_ANGLE){reset_audio();  chThdSleepMilliseconds(1500);}
 		chThdSleepMilliseconds(1000);
 
-		for(uint8_t i = 0 ; i < STABILIZED_AUDIO; i++)
+		for(uint8_t i = 0 ; i < STABILIZATION_TRIES; i++)
 		{
 			chThdSleepMilliseconds(SENSOR_REFRESH_DELAY);
 			turnangle = get_angle();

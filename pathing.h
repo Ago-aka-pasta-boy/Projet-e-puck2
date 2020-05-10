@@ -19,7 +19,8 @@
 #define FAST_SPEED				500
 #define HALT					0
 #define	LARGE_ANGLE				40
-#define STABILIZED_AUDIO		5
+#define STABILIZATION_TRIES		5
+#define STABILIZED_AUDIO		2
 #define MAX_ANGLE_ERROR			15.0f
 #define RAM_SPEED				1000
 #define CELEBRATION_TIME		1000
