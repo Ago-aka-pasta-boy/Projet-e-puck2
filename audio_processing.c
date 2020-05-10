@@ -19,10 +19,6 @@ Adapted from the code given in the EPFL MICRO-315 TP (Spring Semester 2020)
 #include <fft.h>
 #include <arm_math.h>
 
-//TESTING
-#include "leds.h"
-
-
 //Defines
 #define FFT_SIZE 			1024			//Size of the buffer where the result of the FFT is stored
 
@@ -85,9 +81,9 @@ uint16_t max_frequency(float* data)
 void processAudioData(int16_t *data, uint16_t num_samples)
 {
 	//Number of samples in the buffer that we have to fill to FFT_SIZE
-	uint16_t nb_samples = 0;
+	static uint16_t nb_samples = 0;
 	//Phase differences computed from the audio data between respectively left-right and front-back microphones
-	float phase_diff_lr, phase_diff_fb;
+	float phase_diff_lr=0, phase_diff_fb=0;
 	//Loop to fill the buffers
 	for(uint16_t i = 0 ; i < num_samples ; i+=4)
 	{
@@ -115,6 +111,7 @@ void processAudioData(int16_t *data, uint16_t num_samples)
 
 	if(nb_samples >= (2 * FFT_SIZE))
 	{
+
 		//FFT processing
 		doFFT_optimized(FFT_SIZE, micRight_cmplx_input);
 		doFFT_optimized(FFT_SIZE, micLeft_cmplx_input);
@@ -195,4 +192,3 @@ float get_angle(void)
 	angle=atan2f(mov_avg_lr,-(mov_avg_fb))*360.0f/(2.0f*PI);
 	return angle;
 }
-

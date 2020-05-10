@@ -30,5 +30,4 @@ uint8_t get_audio_status(void);
 //Returns the current angle
 float get_angle(void);
 
-
 #endif /* AUDIO_PROCESSING_H */

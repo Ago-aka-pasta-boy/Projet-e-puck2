@@ -63,8 +63,6 @@ int main(void)
     //Main FSM loop
     while (1)
     {
-
-
     	obstacle_type=0;
     	if (!move_forward)
     	{

@@ -1,3 +1,14 @@
+/*
+
+File    : process_image.h
+Author  : Nicolas Zaugg, Sylvain Pellegrini
+Date    : 10 may 2020
+
+Image capturing and processing functions to handle the data from the po8030 camera
+
+Adapted from the code given in the EPFL MICRO-315 TP (Spring Semester 2020)
+*/
+
 #ifndef PROCESS_IMAGE_H
 #define PROCESS_IMAGE_H
 
