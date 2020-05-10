@@ -19,6 +19,10 @@ Adapted from the code given in the EPFL MICRO-315 TP (Spring Semester 2020)
 #include <fft.h>
 #include <arm_math.h>
 
+//TESTING
+#include "leds.h"
+
+
 //Defines
 #define FFT_SIZE 			1024			//Size of the buffer where the result of the FFT is stored
 
@@ -30,9 +34,8 @@ Adapted from the code given in the EPFL MICRO-315 TP (Spring Semester 2020)
 
 #define A					0.925f			//Coefficient for the low-pass filter to apply to the past values
 #define B					0.075f			//= 1-A, coefficient for the new value
-#define BASE_LR_VALUE		0				//Value of the dephasage between left and right microphones when the source is in front
-#define BASE_FB_VALUE		-0.5f			//Value of the dephasage between front and back microphones when the source is in front
-
+#define BASE_LR_VALUE		0				//Value of the phase difference between left and right microphones when the source is in front
+#define BASE_FB_VALUE		-0.5f			//Value of the phase difference between front and back microphones when the source is in front
 
 
 //2 times FFT_SIZE because these arrays contain complex numbers (real + imaginary)
@@ -53,7 +56,7 @@ static float mov_avg_fb = 0;
 static uint8_t audio_status = NO_AUDIO;
 
 
-//Simple function used to detect the highest value in a buffer
+//Simple function used to detect the highest value in the buffer
 uint16_t max_frequency(float* data)
 {
 	float max_norm = MIN_VALUE_THRESHOLD;
@@ -112,24 +115,13 @@ void processAudioData(int16_t *data, uint16_t num_samples)
 
 	if(nb_samples >= (2 * FFT_SIZE))
 	{
-		/*	FFT proccessing
-		*
-		*	This FFT function stores the results in the input buffer given.
-		*	This is an "In Place" function. 
-		*/
-
+		//FFT processing
 		doFFT_optimized(FFT_SIZE, micRight_cmplx_input);
 		doFFT_optimized(FFT_SIZE, micLeft_cmplx_input);
 		doFFT_optimized(FFT_SIZE, micFront_cmplx_input);
 		doFFT_optimized(FFT_SIZE, micBack_cmplx_input);
 
-		/*	Magnitude processing
-		*
-		*	Computes the magnitude of the complex numbers and
-		*	stores them in a buffer of FFT_SIZE because it only contains
-		*	real numbers.
-		*
-		*/
+		//Magnitude processing
 		arm_cmplx_mag_f32(micRight_cmplx_input, micRight_output, FFT_SIZE);
 		arm_cmplx_mag_f32(micLeft_cmplx_input, micLeft_output, FFT_SIZE);
 		arm_cmplx_mag_f32(micFront_cmplx_input, micFront_output, FFT_SIZE);
@@ -142,14 +134,16 @@ void processAudioData(int16_t *data, uint16_t num_samples)
 		uint16_t freq_front = max_frequency(micFront_output);
 		uint16_t freq_back = max_frequency(micBack_output);
 
-
 		//Detection of the wanted frequency and check if all microphones have the same max frequency
 		if((abs(freq_left - FREQ_SOURCE)<= MAX_ERROR) && (freq_right == freq_left)&&
 				(freq_front == freq_left)&&	(freq_back == freq_left))
 		{
-			//Changing the audio status to the case detected
+
+
+			//Update the audio status
 			audio_status = AUDIO_DETECTED;
-			//Computing the phases from the data of two opposite mics and subtracting to obtain the dephasage
+
+			//Computing the phases from the data of two opposite mics and subtracting to obtain the phase difference
 			phase_diff_lr = atan2f(micLeft_cmplx_input[freq_left+1],micLeft_cmplx_input[freq_left])
 												-atan2f(micRight_cmplx_input[freq_right+1],micRight_cmplx_input[freq_right]);
 			phase_diff_fb = atan2f(micFront_cmplx_input[freq_front+1],micFront_cmplx_input[freq_front])
@@ -161,13 +155,13 @@ void processAudioData(int16_t *data, uint16_t num_samples)
 				mov_avg_lr = A * mov_avg_lr + B * phase_diff_lr;
 			}
 
-			//here the same principle is applied to phase differences between front and back
+			//Same principle is applied to the front back phase differences
 			if(fabs(phase_diff_fb)<1)
 			{
 				mov_avg_fb = A * mov_avg_fb + B * phase_diff_fb;
 			}
 		}
-		//if the max frequency of all four microphones was not the one wanted
+		//If the frequencies do not match
 		else
 		{
 			audio_status = NO_AUDIO;
@@ -176,7 +170,7 @@ void processAudioData(int16_t *data, uint16_t num_samples)
 }
 
 
-//Resets the moving average so the filter does not take a lot of time to converge after a large angle
+//Resets the moving average to speed up the settling time after a large rotation
 void reset_audio (void)
 {
 	mov_avg_lr = BASE_LR_VALUE;

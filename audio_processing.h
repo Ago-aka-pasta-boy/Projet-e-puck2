@@ -18,7 +18,7 @@ Adapted from the code given in the EPFL MICRO-315 TP (Spring Semester 2020)
 #define AUDIO_DETECTED		1
 
 
-//Resets the moving average so the filter does not take a lot of time to converge after a large angle
+//Resets the moving average to speed up the settling time after a large rotation
 void reset_audio (void);
 
 //Callback for the audio processing

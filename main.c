@@ -63,6 +63,8 @@ int main(void)
     //Main FSM loop
     while (1)
     {
+
+
     	obstacle_type=0;
     	if (!move_forward)
     	{
@@ -89,11 +91,11 @@ int main(void)
 					break;
 
 				case GATE:
-					move_through_gate();
+					ram_gate();
 					break;
 
 				case GOAL:
-					move_to_goal();
+					goal_success();
 					break;
 
 				case UNKNOWN:

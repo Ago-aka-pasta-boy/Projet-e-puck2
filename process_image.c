@@ -19,7 +19,7 @@
 #define	RATIO_TO_QUALIFY_LINES	0.7		//Ratio to max local mean to compute threshold value
 #define RATIO_TO_QUALIFY_EDGES	2		//Bright side means must register at least twice as high as dark side means for edges
 #define RATIO_TO_CONFIRM_EDGES	0.3		//The higher of the two means for edge deduction must be at least 0.3 times the white line
-#define MIN_LINES_FOR_GOAL		2		//Minimum number to confirm a goal
+#define MIN_LINES_FOR_GOAL		3		//Minimum number to confirm a goal
 
 //Line structure
 struct line {
@@ -44,7 +44,6 @@ static struct obstacle current_obstacles[MAX_OBJECTS];
 static BSEMAPHORE_DECL(image_ready_sem, TRUE);
 
 
-
 //Clears all lines
 void clear_all_lines(void)
 {
@@ -57,6 +56,7 @@ void clear_all_lines(void)
 	}
 }
 
+
 //Clears all obstacles
 void clear_all_obstacles(void)
 {
@@ -67,12 +67,14 @@ void clear_all_obstacles(void)
 	}
 }
 
+
 //Clears a single obstacle index in the array
 void clear_obstacle(uint8_t i)
 {
 	current_obstacles[i].type=0;
 	current_obstacles[i].pos=0;
 }
+
 
 //Extracts lines from the camera data. Used as the basis for obstacle recognition
 void extract_lines(uint8_t *buffer)
@@ -99,7 +101,6 @@ void extract_lines(uint8_t *buffer)
 	if(max_mean<STATIC_NOISE){return;}
 	//Sets a threshold value for line searching
 	threshold = max_mean*RATIO_TO_QUALIFY_LINES;
-
 
 
 	uint16_t i = 0;
@@ -150,6 +151,7 @@ void extract_lines(uint8_t *buffer)
 	}
 }
 
+
 //Extracts edges from the camera data and the lines in the array
 void extract_edges(uint8_t *buffer)
 {
@@ -194,6 +196,7 @@ void extract_edges(uint8_t *buffer)
 	}
 }
 
+
 //Builds a gate from an adjacent right edge - left edge combination if present in the array
 void build_gate(void)
 {
@@ -208,6 +211,7 @@ void build_gate(void)
 	}
 }
 
+
 //Builds a goal from the line data if enough are present in the array
 void build_goal(void)
 {
@@ -216,12 +220,13 @@ void build_goal(void)
 	{
 		if(current_lines[i].exist){line_count++;}
 	}
-	if (line_count > MIN_LINES_FOR_GOAL)
+	if (line_count >= MIN_LINES_FOR_GOAL)
 	{
 	current_obstacles[0].type = GOAL;
 	current_obstacles[0].pos = current_obstacles[1].pos;
 	}
 }
+
 
 //Image capturing thread in charge of capturing the camera data and signaling the process image thread when the data is ready
 static THD_WORKING_AREA(waCaptureImage, 256);
@@ -246,6 +251,7 @@ static THD_FUNCTION(CaptureImage, arg)
 		chBSemSignal(&image_ready_sem);
     }
 }
+
 
 //Image processing thread in charge of preparing the raw data and creating lines and obstacles
 static THD_WORKING_AREA(waProcessImage, 1024);
@@ -285,19 +291,24 @@ static THD_FUNCTION(ProcessImage, arg)
     }
 }
 
+
 //Returns the type of the obstacle in the 0th index of the array, considered the currently seen obstacle, to external modules
-uint8_t get_obstacle_type(void){
+uint8_t get_obstacle_type(void)
+{
 	return current_obstacles[0].type;
 }
 
+
 //Returns the position of the obstacle in the 0th index of the array, considered the currently seen obstacle, to external modules
-uint16_t get_obstacle_pos(void){
+uint16_t get_obstacle_pos(void)
+{
 	return current_obstacles[0].pos;
 }
 
 
 //Starts the image capture and image processing threads
-void process_image_start(void){
+void process_image_start(void)
+{
 	chThdCreateStatic(waProcessImage, sizeof(waProcessImage), NORMALPRIO+1, ProcessImage, NULL);
 	chThdCreateStatic(waCaptureImage, sizeof(waCaptureImage), NORMALPRIO+1, CaptureImage, NULL);
 }
